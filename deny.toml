@@ -1,0 +1,37 @@
+# cargo-deny configuration for patinate
+# https://embarkstudios.github.io/cargo-deny/
+
+[advisories]
+db-path = "~/.cargo/advisory-db"
+db-urls = ["https://github.com/rustsec/advisory-db"]
+
+[licenses]
+allow = [
+    "MIT",
+    "Apache-2.0",
+    "MPL-2.0",      # weak copyleft, file-level only -- fine for MIT consumer
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "CDLA-Permissive-2.0",
+    "ISC",
+    "Unicode-3.0",
+    "Zlib",
+]
+confidence-threshold = 0.8
+
+# libsqlite3-sys bundles SQLite (public domain) inside an MIT-licensed crate.
+# cargo-deny resolves it as MIT from Cargo.toml metadata, but if the bundled
+# feature triggers a license-file scan, this clarification keeps it green.
+[[licenses.clarify]]
+name = "libsqlite3-sys"
+expression = "MIT"
+license-files = [{ path = "LICENSE", hash = 0 }]
+
+[bans]
+multiple-versions = "warn"
+wildcards = "allow"
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"
+allow-registry = ["https://github.com/rust-lang/crates.io-index"]

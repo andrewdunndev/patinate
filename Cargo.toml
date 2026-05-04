@@ -12,7 +12,7 @@ readme = "README.md"
 license = "MIT"
 keywords = ["strava", "heatmap", "cycling", "osm", "poster"]
 categories = ["command-line-utilities", "visualization"]
-publish = false
+publish = true
 
 [[bin]]
 name = "patinate"
