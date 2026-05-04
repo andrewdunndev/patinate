@@ -6,18 +6,6 @@ End-to-end story for a single rider in a single city: install,
 authenticate, sync, fetch a basemap, render.
 
 ### Added
-- `--anonymize` flag on `patinate render` strips the per-activity
-  `data-rider` / `data-bike` / `data-year` / `data-type` attributes
-  from heat paths and scrubs the SVG `<desc>` to city + country only
-  (no exact center coords or radius). Visible image is unchanged. Use
-  whenever the SVG itself will be published. Threat model + per-attr
-  audit lives in CONTRIBUTING.md.
-- `--obfuscation-radius-m` flag overrides the config's
-  `[privacy].obfuscation_radius_m` for a single render. Useful for
-  publishing one-off art at a larger radius without editing the
-  config file. The README recommends 1000 m or larger as a floor for
-  public publication.
-
 - `patinate auth`: interactive OAuth dance with Strava. Opens a
   browser, captures the authorization code on a localhost callback,
   exchanges it for a fresh refresh_token with `activity:read_all`
@@ -45,6 +33,17 @@ authenticate, sync, fetch a basemap, render.
   a positive radius.
 - `--type`, `--gear`, `--cycling`, `--activity-id`, `--min-distance-m`
   filters on `patinate render`.
+- `--anonymize` flag on `patinate render` strips the per-activity
+  `data-rider` / `data-bike` / `data-year` / `data-type` attributes
+  from heat paths and scrubs the SVG `<desc>` to city + country only
+  (no exact center coords or radius). Visible image is unchanged. Use
+  whenever the SVG itself will be published. Threat model + per-attr
+  audit lives in CONTRIBUTING.md.
+- `--obfuscation-radius-m` flag overrides the config's
+  `[privacy].obfuscation_radius_m` for a single render. Useful for
+  publishing one-off art at a larger radius without editing the
+  config file. The README recommends 1000 m or larger as a floor for
+  public publication.
 - `--web`, `--transparent-bg`, `--heat-only`, `--radius-m`,
   `--viewbox-width/-height` overrides. `--web` does single-layer heat
   (no glow stack), drops the visual typography group + tertiary +
