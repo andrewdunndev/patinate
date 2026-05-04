@@ -1,0 +1,36 @@
+# patinate config — example for fixture-driven rendering
+
+[general]
+city_name = "Grand Rapids"
+country = "USA"
+center_lat = 42.9634
+center_lng = -85.6681
+radius_m = 25000
+
+[render]
+theme = "noir_heat"
+viewbox_width = 1200
+viewbox_height = 1600
+
+[privacy]
+# Aquinas College, Grand Rapids -- a public university campus (NOT a
+# residential address), used as a clearly non-identifying example
+# home center for fixture renders. Replace with your own home_lat /
+# home_lng in your real config (kept private at
+# ~/.config/patinate/config.toml). 1000 m radius matches the README's
+# public-publish floor.
+home_lat = 42.9618
+home_lng = -85.6217
+obfuscation_radius_m = 250
+
+
+[strava]
+# client_id is the public half of the Strava OAuth pair; embedded in
+# every authorize URL, so we treat it as documentation rather than secret.
+client_id = "233250"
+
+# client_secret, refresh_token, access_token come from env at runtime:
+#   STRAVA_PATINATE_CLIENT_SECRET   (GitLab group var, masked + protected)
+#   STRAVA_PATINATE_REFRESH_TOKEN   (same)
+#   STRAVA_PATINATE_ACCESS_TOKEN    (optional; auto-refreshed if expired)
+# Local dev: set in ~/.config/patinate/config.toml [strava] block.

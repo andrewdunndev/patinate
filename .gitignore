@@ -1,0 +1,16 @@
+/target
+**/*.rs.bk
+Cargo.lock.bak
+
+# rendered output, reproducible from fixtures
+/heatmap.svg
+/*.svg
+
+# design-session scratch images. Move to docs/ if any are worth keeping.
+/*.png
+/*.webp
+
+# build outputs from `make site` (GitLab Pages CI generates this fresh)
+/public
+
+.DS_Store

@@ -1,0 +1,51 @@
+{
+  "name": "cycle_heat",
+  "bg": "#faf6ed",
+  "text": "#3d2914",
+  "water": "#a8c0d0",
+  "water_line_width": 1.0,
+  "parks": "#cfd9b5",
+  "road_motorway": {
+    "color": "#7a6855",
+    "width": 0.7
+  },
+  "road_trunk": {
+    "color": "#9a8a76",
+    "width": 0.55
+  },
+  "road_primary": {
+    "color": "#b8ac96",
+    "width": 0.42
+  },
+  "road_secondary": {
+    "color": "#c8bca0",
+    "width": 0.32
+  },
+  "road_tertiary": {
+    "color": "#d8ccae",
+    "width": 0.25
+  },
+  "road_residential": {
+    "color": "#e8dfc0",
+    "width": 0.18
+  },
+  "heat": {
+    "color": "#356a8c",
+    "width": 0.7,
+    "alpha": 0.55,
+    "glow_outer_ratio": 3.5,
+    "glow_outer_alpha": 0.1,
+    "glow_inner_ratio": 1.7,
+    "glow_inner_alpha": 0.2
+  },
+  "fade_top": {
+    "from": "#faf6ed",
+    "to": "transparent",
+    "height_pct": 0
+  },
+  "fade_bottom": {
+    "from": "#faf6ed",
+    "to": "transparent",
+    "height_pct": 0
+  }
+}

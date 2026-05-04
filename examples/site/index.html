@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>patinate -- demo</title>
+<style>
+  :root { color-scheme: light dark; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+    line-height: 1.5;
+    color: #1a1a1a;
+    background: #f5f1e8;
+  }
+  @media (prefers-color-scheme: dark) {
+    body { color: #e8e4dc; background: #1a1a1a; }
+    a { color: #ff7a45; }
+  }
+  main { max-width: 60rem; margin: 0 auto; padding: 2rem 1.5rem 4rem; }
+  h1 { font-size: 1.75rem; margin: 0 0 0.5rem; }
+  h2 { font-size: 1.1rem; margin-top: 2rem; }
+  .lede { color: #6b5d4f; max-width: 38rem; }
+  @media (prefers-color-scheme: dark) {
+    .lede { color: #c4b99a; }
+  }
+  .hero {
+    margin: 1.5rem 0;
+    padding: 1rem;
+    background: #1a1a1a;
+    border-radius: 6px;
+    overflow: hidden;
+  }
+  .hero svg { display: block; width: 100%; height: auto; }
+  .hero .heat,
+  .hero .heat-stack { transition: stroke 200ms ease, opacity 200ms ease; }
+  .filter-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin: 1rem 0;
+    font-size: 0.95rem;
+  }
+  .filter-row button {
+    border: 1px solid #c4b99a;
+    background: transparent;
+    color: inherit;
+    padding: 0.4rem 0.9rem;
+    border-radius: 999px;
+    cursor: pointer;
+    font: inherit;
+  }
+  .filter-row button[aria-pressed="true"] {
+    background: #2c2417;
+    color: #faf6ed;
+    border-color: #2c2417;
+  }
+  @media (prefers-color-scheme: dark) {
+    .filter-row button[aria-pressed="true"] {
+      background: #faf6ed;
+      color: #2c2417;
+      border-color: #faf6ed;
+    }
+  }
+  code {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 0.9em;
+    background: rgba(0,0,0,0.06);
+    padding: 0.1em 0.35em;
+    border-radius: 3px;
+  }
+  @media (prefers-color-scheme: dark) {
+    code { background: rgba(255,255,255,0.08); }
+  }
+  footer { margin-top: 3rem; padding-top: 1.5rem; border-top: 1px solid #c4b99a; font-size: 0.85rem; }
+</style>
+</head>
+<body>
+<main>
+  <h1>patinate</h1>
+  <p class="lede">
+    Strava activity rendered as a stylized heatmap poster. The hero
+    below is the bundled <code>fixtures/activities.json</code> (30
+    synthetic rides centered on Grand Rapids) rendered into an
+    inline-embeddable SVG via <code>patinate render --web</code>.
+    Filters demonstrate the data-* attributes the renderer emits on
+    every heat path.
+  </p>
+
+  <div class="filter-row" role="group" aria-label="Activity type filter">
+    <button type="button" data-filter-type="all" aria-pressed="true">All types</button>
+    <button type="button" data-filter-type="Ride" aria-pressed="false">Ride</button>
+    <button type="button" data-filter-type="EBikeRide" aria-pressed="false">E-bike</button>
+    <button type="button" data-filter-type="Run" aria-pressed="false">Run</button>
+    <button type="button" data-filter-type="Walk" aria-pressed="false">Walk</button>
+  </div>
+
+  <div class="hero" id="hero" data-svg-src="heatmap-web.svg" aria-label="patinate heatmap demo"></div>
+
+  <h2>What you're looking at</h2>
+  <p>
+    The basemap is OSM road geometry (water lines + line-water + parks
+    + road tiers). The heat layer is one path per activity, drawn
+    with multiply blend mode so overlapping rides accumulate into
+    brighter color. The patina builds where you ride often.
+  </p>
+
+  <h2>Embed it yourself</h2>
+  <p>
+    The full README at the
+    <a href="https://gitlab.com/dunn.dev/patinate">patinate repo</a>
+    walks through install, OAuth, sync, and render. The web preset
+    targets ~500KB SVG with single-layer heat and 1-digit coord
+    precision; pair with <code>--transparent-bg</code> to inline on a
+    page that already provides its own background.
+  </p>
+
+  <footer>
+    Built with patinate. Source at
+    <a href="https://gitlab.com/dunn.dev/patinate">gitlab.com/dunn.dev/patinate</a>.
+  </footer>
+</main>
+
+<script>
+(async () => {
+  const hero = document.getElementById('hero');
+  const src = hero.dataset.svgSrc;
+  let svg;
+  try {
+    const resp = await fetch(src);
+    if (!resp.ok) throw new Error(`fetch ${src}: ${resp.status}`);
+    hero.innerHTML = await resp.text();
+    svg = hero.querySelector('svg');
+    if (!svg) throw new Error('no <svg> in fetched document');
+    svg.setAttribute('preserveAspectRatio', 'xMidYMid meet');
+  } catch (err) {
+    hero.textContent = `Could not load ${src}: ${err.message}`;
+    return;
+  }
+
+  // Filter behavior. The heat path data-type attr drives visibility.
+  const buttons = document.querySelectorAll('[data-filter-type]');
+  const apply = (type) => {
+    const paths = svg.querySelectorAll('.heat path[data-type]');
+    paths.forEach((p) => {
+      const match = type === 'all' || p.getAttribute('data-type') === type;
+      p.style.opacity = match ? '' : '0.05';
+    });
+  };
+  buttons.forEach((btn) => {
+    btn.addEventListener('click', () => {
+      buttons.forEach((b) => b.setAttribute('aria-pressed', String(b === btn)));
+      apply(btn.dataset.filterType);
+    });
+  });
+})();
+</script>
+</body>
+</html>

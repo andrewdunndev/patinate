@@ -1,0 +1,51 @@
+{
+  "name": "warm_beige",
+  "bg": "#faf6ed",
+  "text": "#2c2417",
+  "water": "#a8c0d0",
+  "water_line_width": 1.4,
+  "parks": "#cfd9b5",
+  "road_motorway": {
+    "color": "#4a3a26",
+    "width": 0.85
+  },
+  "road_trunk": {
+    "color": "#5e4c34",
+    "width": 0.7
+  },
+  "road_primary": {
+    "color": "#7a6855",
+    "width": 0.55
+  },
+  "road_secondary": {
+    "color": "#9a8a76",
+    "width": 0.45
+  },
+  "road_tertiary": {
+    "color": "#c4b89e",
+    "width": 0.32
+  },
+  "road_residential": {
+    "color": "#e8dfc0",
+    "width": 0.18
+  },
+  "heat": {
+    "color": "#b53d10",
+    "width": 0.7,
+    "alpha": 0.55,
+    "glow_outer_ratio": 3.5,
+    "glow_outer_alpha": 0.1,
+    "glow_inner_ratio": 1.7,
+    "glow_inner_alpha": 0.2
+  },
+  "fade_top": {
+    "from": "#faf6ed",
+    "to": "transparent",
+    "height_pct": 0
+  },
+  "fade_bottom": {
+    "from": "#faf6ed",
+    "to": "transparent",
+    "height_pct": 0
+  }
+}

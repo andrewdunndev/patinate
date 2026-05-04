@@ -1,0 +1,47 @@
+{
+  "name": "noir_heat",
+  "bg": "#000000",
+  "text": "#f4f4f4",
+  "water": "#080808",
+  "parks": "#161616",
+  "water_line_width": 1.2,
+  "road_motorway": {
+    "color": "#ffffff",
+    "width": 1.6
+  },
+  "road_trunk": {
+    "color": "#e8e8e8",
+    "width": 1.3
+  },
+  "road_primary": {
+    "color": "#cfcfcf",
+    "width": 1.0
+  },
+  "road_secondary": {
+    "color": "#9a9a9a",
+    "width": 0.7
+  },
+  "road_tertiary": {
+    "color": "#6a6a6a",
+    "width": 0.45
+  },
+  "road_residential": {
+    "color": "#3e3e3e",
+    "width": 0.3
+  },
+  "heat": {
+    "color": "#ff5a1f",
+    "width": 0.9,
+    "alpha": 0.55
+  },
+  "fade_top": {
+    "from": "#000000",
+    "to": "transparent",
+    "height_pct": 0
+  },
+  "fade_bottom": {
+    "from": "#000000",
+    "to": "transparent",
+    "height_pct": 0
+  }
+}
