@@ -19,11 +19,12 @@ maintainer-attributable coordinates.
 ## Quickstart
 
 ```bash
-cargo install --git https://gitlab.com/dunn.dev/patinate
+cargo install patinate
 ```
 
-Build needs a C compiler (`build-essential` / `xcode-select --install`).
-No external runtime deps.
+(Or `cargo install --git https://gitlab.com/dunn.dev/patinate` to
+build from source.) Build needs a C compiler (`build-essential` /
+`xcode-select --install`). No external runtime deps.
 
 1. Register a Strava app at <https://www.strava.com/settings/api>.
    Authorization callback domain: `localhost`.
