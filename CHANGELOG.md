@@ -1,5 +1,17 @@
 # Changelog
 
+## v0.1.1 -- darwin build fix
+
+### Fixed
+- `rust-toolchain.toml` now lists `targets = ["aarch64-apple-darwin"]`
+  so rustup provisions the cross-compile target when honoring the
+  pinned 1.94.0 channel inside the nomograph rust-cli CI image. The
+  v0.1.0 tag pipeline failed `build:darwin-arm64` because the image
+  prepared the target for its default toolchain but our pinned
+  toolchain didn't inherit it. crates.io publish was unaffected
+  (v0.1.0 is on crates.io). v0.1.1 ships full GitLab Release
+  artifacts for both linux-amd64 and darwin-arm64.
+
 ## v0.1.0 -- first public release
 
 End-to-end story for a single rider in a single city: install,
