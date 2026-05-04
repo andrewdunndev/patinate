@@ -1,3 +1,10 @@
 [toolchain]
 channel = "1.94.0"
 components = ["rustfmt", "clippy"]
+# Targets must be listed here so rustup provisions them when this
+# toolchain.toml triggers a fresh toolchain install (e.g. inside the
+# nomograph rust-cli CI image, which prepares the targets for its
+# default toolchain but rustup downloads a fresh 1.94.0 to honor
+# this file). Without this line the cross-compile to darwin fails
+# with "the aarch64-apple-darwin target may not be installed."
+targets = ["aarch64-apple-darwin"]
