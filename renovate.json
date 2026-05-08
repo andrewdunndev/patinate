@@ -1,0 +1,20 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["config:recommended"],
+  "schedule": ["before 6am on monday"],
+  "labels": ["dependencies"],
+  "packageRules": [
+    {
+      "description": "Group + auto-merge minor + patch updates after CI passes.",
+      "matchUpdateTypes": ["minor", "patch"],
+      "groupName": "all minor + patch",
+      "automerge": true
+    },
+    {
+      "description": "Major updates: separate PRs, manual review.",
+      "matchUpdateTypes": ["major"],
+      "groupName": null,
+      "automerge": false
+    }
+  ]
+}
