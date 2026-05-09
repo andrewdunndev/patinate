@@ -1,16 +1,6 @@
-include:
-  - template: Jobs/Secret-Detection.gitlab-ci.yml
-  - component: gitlab.com/nomograph/pipeline/rust-cli@v2.4.6
-    inputs:
-      binary_name: patinate
-      project_description: "Render Strava activity into stylized heatmap posters and inline SVG. Real polyline-circle obfuscation. Privacy flags for shippable renders."
-      audit_allow_failure: false
-      crates_publish: true
-
-stages: [test, build, sign, publish, release, deploy]
-
 default:
-  tags: [storr]
+  tags:
+    - storr
   interruptible: true
   retry:
     max: 2
@@ -18,14 +8,86 @@ default:
       - runner_system_failure
       - stuck_or_timeout_failure
 
+# v2.1.x catalog: auto-cancel build/test on superseded MR pushes;
+# release-stage jobs (template-side interruptible: false) continue.
+# on_job_failure: all stops the pipeline on a release-blocker fail.
+workflow:
+  auto_cancel:
+    on_new_commit: interruptible
+    on_job_failure: all
+
+stages:
+  - lint
+  - test
+  - build
+  - package
+  - release
+  - deploy
+
 variables:
   CARGO_HOME: ${CI_PROJECT_DIR}/.cargo
 
+include:
+  # GitLab Ultimate security scanner (preserved from bespoke CI).
+  - template: Jobs/Secret-Detection.gitlab-ci.yml
+
+  # Lint: cargo fmt + clippy via the catalog's pinned ci-rust.
+  - component: gitlab.com/dunn.dev/pipeline/rust-lint@2.1.0
+
+  # Audit: cargo audit. Catalog default is allow_failure: true;
+  # patinate previously overrode to false (audit_allow_failure:
+  # false in the nomograph super-component) — preserved as a
+  # job-level override below.
+  - component: gitlab.com/dunn.dev/pipeline/rust-audit@2.1.0
+
+  # Branch verification: cargo build + test on every push.
+  - component: gitlab.com/dunn.dev/pipeline/rust-build@2.1.0
+    inputs:
+      package_path: .
+
+  # Tag-only: parallel:matrix cross-compile (linux/amd64+arm64,
+  # darwin/arm64) via cargo-zigbuild + per-binary cosign signature
+  # + per-binary .sha256 + upload to package registry.
+  - component: gitlab.com/dunn.dev/pipeline/rust-release-binary@2.1.0
+    inputs:
+      binary_name: patinate
+      package_name: patinate
+
+  # Tag-only: CycloneDX SBOM per binary via syft.
+  - component: gitlab.com/dunn.dev/pipeline/rust-sbom@2.1.0
+    inputs:
+      package_name: patinate
+
+  # Tag-only: SLSA v1.0 provenance per binary, cosign-signed via
+  # GitLab OIDC keyless. Language-agnostic; same template Go uses.
+  - component: gitlab.com/dunn.dev/pipeline/slsa-attest@2.1.0
+
+  # Tag-only: GitLab Release with binaries + SBOMs + attestations
+  # linked. Idempotent across pipeline reruns.
+  - component: gitlab.com/dunn.dev/pipeline/release-create@2.1.0
+    inputs:
+      package_name: patinate
+
+  # Tag-only: idempotent crates.io publish. Requires
+  # CARGO_REGISTRY_TOKEN as a masked, protected CI variable.
+  - component: gitlab.com/dunn.dev/pipeline/rust-crates-publish@2.1.0
+    inputs:
+      crate_name: patinate
+
+# Override audit to fail-the-build (was audit_allow_failure: false
+# in the nomograph super-component; preserved here).
+audit:
+  allow_failure: false
+
 # GitLab Pages: render the bundled fixture in --web mode and serve
 # the editorial demo. Only deploys from main.
+#
+# Privacy: the demo renders fixtures/activities.json, which is
+# public Strava segment polylines (athlete IDs zeroed, gear IDs
+# placeholders, names generic). No real-rider identifiers ship.
 pages:
   stage: deploy
-  image: registry.gitlab.com/nomograph/pipeline/rust-cli:latest
+  image: registry.gitlab.com/dunn.dev/pipeline/ci-rust:2.1.0
   cache:
     - key: cargo-registry-${CI_COMMIT_REF_SLUG}
       paths:
@@ -48,9 +110,6 @@ pages:
     - test -f fixtures/grand-rapids.osm.json.gz
         || ./target/release/patinate fetch-osm --city "Grand Rapids" --radius-m 25000
              --out fixtures/grand-rapids.osm.json.gz
-    # Privacy: the demo renders fixtures/activities.json, which is
-    # public Strava segment polylines (athlete IDs zeroed, gear IDs
-    # placeholders, names generic). No real-rider identifiers ship.
     - ./target/release/patinate render
         --config fixtures/config.toml
         --osm fixtures/grand-rapids.osm.json.gz
