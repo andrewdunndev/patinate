@@ -52,7 +52,7 @@ rusqlite = { version = "0.32", features = ["bundled"] }
 svg = "0.18"
 
 # directories
-directories = "5"
+directories = "6"
 
 # misc
 chrono = { version = "0.4", features = ["serde"] }
