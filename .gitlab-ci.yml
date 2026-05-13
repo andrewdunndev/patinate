@@ -74,30 +74,30 @@ include:
     inputs:
       crate_name: patinate
 
+  # patinate.dunn.dev site at web/ — canonical web-starter Astro
+  # scaffold per @dunn.dev/reference. Cloudflare Worker with bound
+  # static assets, custom-domain binding declared in wrangler.toml.
+  # Build runs on every push + MR; deploy runs only on main.
+  #
+  # The live heatmap embed (web/public/heatmap-web.svg) is
+  # committed to the repo (rendered locally from
+  # fixtures/activities.json + cached OSM basemap), so the deploy
+  # pipeline doesn't need a Rust build. Regenerate the heatmap
+  # when fixtures or theme renderer change.
+  #
+  # Privacy: the bundled fixture is public Strava segment
+  # polylines (athlete IDs zeroed, gear IDs placeholders, names
+  # generic). No real-rider identifiers ship.
+  - component: gitlab.com/dunn.dev/pipeline/cloudflare-worker@2.2.3
+    inputs:
+      wrangler_config: web/wrangler.toml
+      build_command: npm run build
+      output_dir: web/dist
+      needs_npm_install: true
+      npm_dir: web
+      production_url: https://patinate.dunn.dev
+
 # Override audit to fail-the-build (was audit_allow_failure: false
 # in the nomograph super-component; preserved here).
 audit:
   allow_failure: false
-
-# patinate.dunn.dev site at web/ — canonical web-starter Astro
-# scaffold per @dunn.dev/reference. Cloudflare Worker with bound
-# static assets, custom-domain binding declared in wrangler.toml.
-# Build runs on every push + MR; deploy runs only on main.
-#
-# The live heatmap embed (web/public/heatmap-web.svg) is committed
-# to the repo (rendered locally via `make heatmap` from
-# fixtures/activities.json + the cached OSM basemap), so the deploy
-# pipeline doesn't need a Rust build. Regenerate the heatmap when
-# fixtures change or theme renderer changes; see the Makefile.
-#
-# Privacy: the bundled fixture is public Strava segment polylines
-# (athlete IDs zeroed, gear IDs placeholders, names generic). No
-# real-rider identifiers ship.
-- component: gitlab.com/dunn.dev/pipeline/cloudflare-worker@2.2.3
-  inputs:
-    wrangler_config: web/wrangler.toml
-    build_command: npm run build
-    output_dir: web/dist
-    needs_npm_install: true
-    npm_dir: web
-    production_url: https://patinate.dunn.dev

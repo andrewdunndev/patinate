@@ -7,26 +7,24 @@
   <text x="128" y="56" text-anchor="middle" font-size="32" font-weight="700" fill="#4a6741">patinate</text>
   <text x="128" y="76" text-anchor="middle" font-size="10" fill="#707070">patina builds where you ride often</text>
 
-  <!-- glyph band: y 90-200. City grid + heat trail. The patina effect
-       lives in three stacked low-alpha strokes; here in moss to match
-       the estate's canonical glyph palette. -->
-  <g transform="translate(80 96)" stroke="#4a6741" fill="none" stroke-linecap="round">
-    <!-- grid: 4 thin streets each direction -->
-    <line x1="0"  y1="24" x2="96" y2="24" stroke-width="0.8"/>
-    <line x1="0"  y1="48" x2="96" y2="48" stroke-width="0.8"/>
-    <line x1="0"  y1="72" x2="96" y2="72" stroke-width="0.8"/>
-    <line x1="24" y1="0"  x2="24" y2="96" stroke-width="0.8"/>
-    <line x1="48" y1="0"  x2="48" y2="96" stroke-width="0.8"/>
-    <line x1="72" y1="0"  x2="72" y2="96" stroke-width="0.8"/>
-    <!-- arterials -->
-    <line x1="0"  y1="48" x2="96" y2="48" stroke-width="2"/>
-    <line x1="48" y1="0"  x2="48" y2="96" stroke-width="2"/>
-    <!-- heat trail: three stacked strokes carrying the patina-buildup -->
-    <path d="M 16 84 Q 36 64, 48 48 T 86 14" stroke-width="7" opacity="0.18"/>
-    <path d="M 16 84 Q 36 64, 48 48 T 86 14" stroke-width="4" opacity="0.5"/>
-    <path d="M 16 84 Q 36 64, 48 48 T 86 14" stroke-width="2" opacity="1"/>
-    <!-- home dot anchors the trail -->
-    <circle cx="16" cy="84" r="3" fill="#4a6741" stroke="none"/>
+  <!-- glyph band: y 90-200. Same 64-unit composition as the favicon
+       and the site hero-glyph (single source of brand identity);
+       scaled 1.5x and translated to fit the glyph band. -->
+  <g transform="translate(80 100) scale(1.5)" stroke="#4a6741" fill="none" stroke-linecap="round">
+    <line x1="8"  y1="16" x2="56" y2="16" stroke-width="0.8"/>
+    <line x1="8"  y1="28" x2="56" y2="28" stroke-width="0.8"/>
+    <line x1="8"  y1="40" x2="56" y2="40" stroke-width="0.8"/>
+    <line x1="8"  y1="52" x2="56" y2="52" stroke-width="0.8"/>
+    <line x1="16" y1="8"  x2="16" y2="56" stroke-width="0.8"/>
+    <line x1="28" y1="8"  x2="28" y2="56" stroke-width="0.8"/>
+    <line x1="40" y1="8"  x2="40" y2="56" stroke-width="0.8"/>
+    <line x1="52" y1="8"  x2="52" y2="56" stroke-width="0.8"/>
+    <line x1="8"  y1="34" x2="56" y2="34" stroke-width="2"/>
+    <line x1="34" y1="8"  x2="34" y2="56" stroke-width="2"/>
+    <path d="M 14 50 Q 24 42, 34 34 T 52 12" stroke-width="6" opacity="0.18"/>
+    <path d="M 14 50 Q 24 42, 34 34 T 52 12" stroke-width="3.5" opacity="0.5"/>
+    <path d="M 14 50 Q 24 42, 34 34 T 52 12" stroke-width="1.8" opacity="1"/>
+    <circle cx="14" cy="50" r="2.4" fill="#4a6741" stroke="none"/>
   </g>
 
   <!-- output line: y 200-256 -->

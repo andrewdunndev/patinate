@@ -1,28 +1,18 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 140 96" role="img" aria-label="patinate glyph: a heat trail accumulating over a city grid, anchored by a home dot.">
-  <g stroke-linecap="round">
-    <!-- light street grid -->
-    <line x1="0"   y1="20"  x2="140" y2="20"  stroke="#c4b99a" stroke-width="0.7"/>
-    <line x1="0"   y1="40"  x2="140" y2="40"  stroke="#c4b99a" stroke-width="0.7"/>
-    <line x1="0"   y1="60"  x2="140" y2="60"  stroke="#c4b99a" stroke-width="0.7"/>
-    <line x1="0"   y1="80"  x2="140" y2="80"  stroke="#c4b99a" stroke-width="0.7"/>
-    <line x1="20"  y1="0"   x2="20"  y2="96"  stroke="#c4b99a" stroke-width="0.7"/>
-    <line x1="44"  y1="0"   x2="44"  y2="96"  stroke="#c4b99a" stroke-width="0.7"/>
-    <line x1="68"  y1="0"   x2="68"  y2="96"  stroke="#c4b99a" stroke-width="0.7"/>
-    <line x1="92"  y1="0"   x2="92"  y2="96"  stroke="#c4b99a" stroke-width="0.7"/>
-    <line x1="116" y1="0"   x2="116" y2="96"  stroke="#c4b99a" stroke-width="0.7"/>
-    <!-- arterials -->
-    <line x1="0"   y1="50"  x2="140" y2="50"  stroke="#6b5d4f" stroke-width="1.6"/>
-    <line x1="68"  y1="0"   x2="68"  y2="96"  stroke="#6b5d4f" stroke-width="1.6"/>
-    <!-- heat trail (three stacked strokes for the patina look) -->
-    <path d="M 24 84 Q 50 70, 68 50 T 116 16" stroke="#ff5a1f" stroke-width="6" fill="none" opacity="0.18"/>
-    <path d="M 24 84 Q 50 70, 68 50 T 116 16" stroke="#ff5a1f" stroke-width="4" fill="none" opacity="0.45"/>
-    <path d="M 24 84 Q 50 70, 68 50 T 116 16" stroke="#ff5a1f" stroke-width="2" fill="none" opacity="0.95"/>
-    <!-- a crossing route to show overlap -->
-    <path d="M 124 80 Q 96 60, 78 44 T 36 14" stroke="#ff5a1f" stroke-width="5" fill="none" opacity="0.12"/>
-    <path d="M 124 80 Q 96 60, 78 44 T 36 14" stroke="#ff5a1f" stroke-width="3" fill="none" opacity="0.36"/>
-    <path d="M 124 80 Q 96 60, 78 44 T 36 14" stroke="#ff5a1f" stroke-width="1.5" fill="none" opacity="0.85"/>
-    <!-- home dot -->
-    <circle cx="24" cy="84" r="2.4" fill="#2c2417"/>
-    <circle cx="24" cy="84" r="5" fill="none" stroke="#2c2417" stroke-width="0.7"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="patinate: a heat trail building over a city grid.">
+  <g stroke="#4a6741" fill="none" stroke-linecap="round">
+    <line x1="8"  y1="16" x2="56" y2="16" stroke-width="0.8"/>
+    <line x1="8"  y1="28" x2="56" y2="28" stroke-width="0.8"/>
+    <line x1="8"  y1="40" x2="56" y2="40" stroke-width="0.8"/>
+    <line x1="8"  y1="52" x2="56" y2="52" stroke-width="0.8"/>
+    <line x1="16" y1="8"  x2="16" y2="56" stroke-width="0.8"/>
+    <line x1="28" y1="8"  x2="28" y2="56" stroke-width="0.8"/>
+    <line x1="40" y1="8"  x2="40" y2="56" stroke-width="0.8"/>
+    <line x1="52" y1="8"  x2="52" y2="56" stroke-width="0.8"/>
+    <line x1="8"  y1="34" x2="56" y2="34" stroke-width="2"/>
+    <line x1="34" y1="8"  x2="34" y2="56" stroke-width="2"/>
+    <path d="M 14 50 Q 24 42, 34 34 T 52 12" stroke-width="6" opacity="0.18"/>
+    <path d="M 14 50 Q 24 42, 34 34 T 52 12" stroke-width="3.5" opacity="0.5"/>
+    <path d="M 14 50 Q 24 42, 34 34 T 52 12" stroke-width="1.8" opacity="1"/>
   </g>
+  <circle cx="14" cy="50" r="2.4" fill="#4a6741"/>
 </svg>
