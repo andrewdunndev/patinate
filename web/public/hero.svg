@@ -3,13 +3,13 @@
   <g font-family="IBM Plex Sans, Helvetica, Arial, sans-serif">
 
   <!-- top metadata row: y 0-48 -->
-  <text x="60" y="34" font-size="10" font-weight="600" font-family="IBM Plex Mono, Menlo, monospace" fill="#707070" letter-spacing="1.4">PATINATE · STRAVA → POSTER · WHERE YOU RIDE OFTEN BUILDS BRIGHTER</text>
+  <text x="60" y="34" font-size="10" font-weight="600" font-family="IBM Plex Mono, Menlo, monospace" fill="#707070" letter-spacing="1.4">PATINATE · STRAVA → POSTER · THE PATINA OF A YEAR</text>
   <text x="1140" y="34" text-anchor="end" font-size="10" font-weight="600" font-family="IBM Plex Mono, Menlo, monospace" fill="#707070" letter-spacing="1.4">2026</text>
   <line x1="60" y1="48" x2="1140" y2="48" stroke="#e0e0e0" stroke-width="1"/>
 
   <!-- title block: y 60-200, left -->
   <text x="60" y="138" font-size="72" font-weight="700" fill="#4a6741" letter-spacing="-2">patinate</text>
-  <text x="60" y="172" font-size="14" fill="#404040">render Strava activity into stylized heatmap posters</text>
+  <text x="60" y="172" font-size="14" fill="#404040">Strava activity, rendered as a stylized heatmap poster</text>
   <text x="60" y="192" font-size="14" fill="#404040">where the patina builds in the streets you ride often.</text>
   <text x="60" y="222" font-size="12" font-style="italic" fill="#404040">a poster of your year, drawn by your feet.</text>
 
@@ -17,20 +17,14 @@
        the favicon, avatar glyph band, and site hero-glyph (single
        source of patinate identity); scaled 2.2x for the hero. -->
   <g transform="translate(110 240) scale(2.2)" stroke="#4a6741" fill="none" stroke-linecap="round">
-    <line x1="8"  y1="16" x2="56" y2="16" stroke-width="0.8"/>
-    <line x1="8"  y1="28" x2="56" y2="28" stroke-width="0.8"/>
-    <line x1="8"  y1="40" x2="56" y2="40" stroke-width="0.8"/>
-    <line x1="8"  y1="52" x2="56" y2="52" stroke-width="0.8"/>
-    <line x1="16" y1="8"  x2="16" y2="56" stroke-width="0.8"/>
-    <line x1="28" y1="8"  x2="28" y2="56" stroke-width="0.8"/>
-    <line x1="40" y1="8"  x2="40" y2="56" stroke-width="0.8"/>
-    <line x1="52" y1="8"  x2="52" y2="56" stroke-width="0.8"/>
-    <line x1="8"  y1="34" x2="56" y2="34" stroke-width="2"/>
-    <line x1="34" y1="8"  x2="34" y2="56" stroke-width="2"/>
-    <path d="M 14 50 Q 24 42, 34 34 T 52 12" stroke-width="6" opacity="0.18"/>
-    <path d="M 14 50 Q 24 42, 34 34 T 52 12" stroke-width="3.5" opacity="0.5"/>
-    <path d="M 14 50 Q 24 42, 34 34 T 52 12" stroke-width="1.8" opacity="1"/>
-    <circle cx="14" cy="50" r="2.4" fill="#4a6741" stroke="none"/>
+    <line x1="8"  y1="20" x2="56" y2="20" stroke-width="0.9"/>
+    <line x1="8"  y1="44" x2="56" y2="44" stroke-width="0.9"/>
+    <line x1="20" y1="8"  x2="20" y2="56" stroke-width="0.9"/>
+    <line x1="44" y1="8"  x2="44" y2="56" stroke-width="0.9"/>
+    <line x1="8"  y1="32" x2="56" y2="32" stroke-width="2.2"/>
+    <line x1="32" y1="8"  x2="32" y2="56" stroke-width="2.2"/>
+    <path d="M 14 50 Q 24 42, 32 32 T 52 14" stroke-width="2.6"/>
+    <circle cx="14" cy="50" r="2.6" fill="#4a6741" stroke="none"/>
   </g>
 
   <!-- column headers: y 60-90, right -->
@@ -41,33 +35,33 @@
   <rect x="560" y="84" width="270" height="130" rx="3" fill="#ffffff" stroke="#e0e0e0" stroke-width="1"/>
   <text x="578" y="106" font-size="10" font-weight="700" font-family="IBM Plex Mono, Menlo, monospace" fill="#707070" letter-spacing="1.4">IN</text>
   <text x="578" y="152" font-size="32" font-weight="700" fill="#4a6741" letter-spacing="-0.5">activities</text>
-  <text x="578" y="178" font-size="11" fill="#404040">Strava OAuth → polyline + segments + timestamps</text>
+  <text x="578" y="178" font-size="11" fill="#404040">Strava OAuth → polyline + timestamps</text>
   <text x="578" y="200" font-size="9" font-family="IBM Plex Mono, Menlo, monospace" fill="#707070" letter-spacing="0.6">OAUTH · INCREMENTAL · CACHED</text>
 
   <!-- tile 2: top-right (DISCIPLINE · POSTURE) -->
   <rect x="850" y="84" width="270" height="130" rx="3" fill="#ffffff" stroke="#e0e0e0" stroke-width="1"/>
   <text x="868" y="106" font-size="10" font-weight="700" font-family="IBM Plex Mono, Menlo, monospace" fill="#707070" letter-spacing="1.4">POSTURE</text>
   <text x="868" y="152" font-size="32" font-weight="700" fill="#4a6741" letter-spacing="-0.5">private</text>
-  <text x="868" y="178" font-size="11" fill="#404040">home obfuscation + segment-name strip + ID zeroing</text>
-  <text x="868" y="200" font-size="9" font-family="IBM Plex Mono, Menlo, monospace" fill="#707070" letter-spacing="0.6">CIRCLE-OBFUSCATE · 1KM+ DEFAULT</text>
+  <text x="868" y="178" font-size="11" fill="#404040">home obfuscation + segment + ID strip</text>
+  <text x="868" y="200" font-size="9" font-family="IBM Plex Mono, Menlo, monospace" fill="#707070" letter-spacing="0.6">CIRCLE-OBFUSCATE · 1KM+</text>
 
   <!-- tile 3: bottom-left (FLOW · OUT) -->
   <rect x="560" y="224" width="270" height="130" rx="3" fill="#ffffff" stroke="#e0e0e0" stroke-width="1"/>
   <text x="578" y="246" font-size="10" font-weight="700" font-family="IBM Plex Mono, Menlo, monospace" fill="#707070" letter-spacing="1.4">OUT</text>
   <text x="578" y="292" font-size="32" font-weight="700" fill="#4a6741" letter-spacing="-0.5">posters</text>
-  <text x="578" y="318" font-size="11" fill="#404040">stylized SVG (vector) + PNG via resvg, four themes</text>
-  <text x="578" y="340" font-size="9" font-family="IBM Plex Mono, Menlo, monospace" fill="#707070" letter-spacing="0.6">NOIR · BLUEPRINT · WARM-BEIGE · CYCLE</text>
+  <text x="578" y="318" font-size="11" fill="#404040">stylized SVG + PNG via resvg</text>
+  <text x="578" y="340" font-size="9" font-family="IBM Plex Mono, Menlo, monospace" fill="#707070" letter-spacing="0.6">FOUR THEMES · SVG + PNG</text>
 
   <!-- tile 4: bottom-right (DISCIPLINE · LIFETIME) -->
   <rect x="850" y="224" width="270" height="130" rx="3" fill="#ffffff" stroke="#e0e0e0" stroke-width="1"/>
   <text x="868" y="246" font-size="10" font-weight="700" font-family="IBM Plex Mono, Menlo, monospace" fill="#707070" letter-spacing="1.4">LIFETIME</text>
   <text x="868" y="292" font-size="32" font-weight="700" fill="#4a6741" letter-spacing="-0.5">local</text>
-  <text x="868" y="318" font-size="11" fill="#404040">your laptop, your activities, your map — no server</text>
+  <text x="868" y="318" font-size="11" fill="#404040">your laptop, your data, no server</text>
   <text x="868" y="340" font-size="9" font-family="IBM Plex Mono, Menlo, monospace" fill="#707070" letter-spacing="0.6">ONE OPERATOR · NO TELEMETRY</text>
 
   <!-- bottom metadata row -->
   <line x1="60" y1="386" x2="1140" y2="386" stroke="#e0e0e0" stroke-width="1"/>
-  <text x="60" y="412" font-size="10" font-weight="600" font-family="IBM Plex Mono, Menlo, monospace" fill="#707070" letter-spacing="1.4">RUST · CLI · STRAVA · OSM · SVG/PNG · COSIGN</text>
+  <text x="60" y="412" font-size="10" font-weight="600" font-family="IBM Plex Mono, Menlo, monospace" fill="#707070" letter-spacing="1.4">RUST · STRAVA · OSM · SVG · COSIGN</text>
   <text x="1140" y="412" text-anchor="end" font-size="10" font-weight="600" font-family="IBM Plex Mono, Menlo, monospace" fill="#707070" letter-spacing="1.4">MIT · GITLAB.COM/DUNN.DEV/PATINATE</text>
   </g>
 </svg>
