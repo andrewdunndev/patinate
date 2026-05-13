@@ -1,0 +1,37 @@
+<svg viewBox="0 0 256 256" width="256" height="256" font-family="Helvetica, Arial, sans-serif" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="patinate avatar: a city grid carries a heat path that builds where you ride often.">
+  <g font-family="Helvetica, Arial, sans-serif">
+  <rect x="0" y="0" width="256" height="256" fill="#ffffff"/>
+  <rect x="0" y="0" width="256" height="256" fill="none" stroke="#e0e0e0" stroke-width="1"/>
+
+  <!-- title block: y 0-90 -->
+  <text x="128" y="56" text-anchor="middle" font-size="32" font-weight="700" fill="#4a6741">patinate</text>
+  <text x="128" y="76" text-anchor="middle" font-size="10" fill="#707070">patina builds where you ride often</text>
+
+  <!-- glyph band: y 90-200. City grid + heat trail. The patina effect
+       lives in three stacked low-alpha strokes; here in moss to match
+       the estate's canonical glyph palette. -->
+  <g transform="translate(80 96)" stroke="#4a6741" fill="none" stroke-linecap="round">
+    <!-- grid: 4 thin streets each direction -->
+    <line x1="0"  y1="24" x2="96" y2="24" stroke-width="0.8"/>
+    <line x1="0"  y1="48" x2="96" y2="48" stroke-width="0.8"/>
+    <line x1="0"  y1="72" x2="96" y2="72" stroke-width="0.8"/>
+    <line x1="24" y1="0"  x2="24" y2="96" stroke-width="0.8"/>
+    <line x1="48" y1="0"  x2="48" y2="96" stroke-width="0.8"/>
+    <line x1="72" y1="0"  x2="72" y2="96" stroke-width="0.8"/>
+    <!-- arterials -->
+    <line x1="0"  y1="48" x2="96" y2="48" stroke-width="2"/>
+    <line x1="48" y1="0"  x2="48" y2="96" stroke-width="2"/>
+    <!-- heat trail: three stacked strokes carrying the patina-buildup -->
+    <path d="M 16 84 Q 36 64, 48 48 T 86 14" stroke-width="7" opacity="0.18"/>
+    <path d="M 16 84 Q 36 64, 48 48 T 86 14" stroke-width="4" opacity="0.5"/>
+    <path d="M 16 84 Q 36 64, 48 48 T 86 14" stroke-width="2" opacity="1"/>
+    <!-- home dot anchors the trail -->
+    <circle cx="16" cy="84" r="3" fill="#4a6741" stroke="none"/>
+  </g>
+
+  <!-- output line: y 200-256 -->
+  <line x1="40" y1="200" x2="216" y2="200" stroke="#e0e0e0" stroke-width="1"/>
+  <text x="128" y="218" text-anchor="middle" font-size="9" font-weight="600" fill="#0a0a0a">poster · inline svg · privacy-aware coords</text>
+  <text x="128" y="232" text-anchor="middle" font-size="8" fill="#707070">rust · cli · single household</text>
+  </g>
+</svg>

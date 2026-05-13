@@ -1,0 +1,223 @@
+---
+import Layout from '../layouts/Layout.astro';
+---
+<Layout title="Home" description="patinate renders Strava activity into stylized heatmap posters. Streets ridden often appear bright; streets ridden once appear faint. The patina builds where you ride.">
+  <header class="hero">
+    <img class="hero-glyph" src="/hero-glyph.svg" alt="" aria-hidden="true" />
+    <p class="page-eyebrow">vol 0.1 · strava → poster</p>
+    <h1 class="hero-title">a field of routes.</h1>
+    <p class="hero-lede">
+      Strava activity rendered as a stylized heatmap. Streets ridden
+      often appear <em>bright</em>; streets ridden once appear faint.
+      The patina builds where you ride.
+    </p>
+    <p class="hero-tagline">a poster of your year, drawn by your feet.</p>
+    <div class="hero-cta">
+      <a class="cta-primary" href="https://gitlab.com/dunn.dev/patinate">Read on GitLab →</a>
+      <a class="cta-secondary" href="https://gitlab.com/dunn.dev/patinate/-/releases">Releases</a>
+    </div>
+  </header>
+
+  <section>
+    <h2 class="section-title">Plate i. — Grand Rapids</h2>
+    <p class="section-prose">
+      The print below is the bundled <code>fixtures/activities.json</code>
+      rendered live with <code>patinate render --theme cycle_heat --web --transparent-bg</code>.
+      Filter by activity type to fade the rest into the patina, the
+      way overlapping strokes accumulate when you ride.
+    </p>
+    <figure class="diagram print-frame">
+      <p class="print-num"><span>plate i.</span> · grand rapids, mi · usa</p>
+      <div class="heatmap-host" id="heatmap" aria-label="Live patinate heatmap rendering of the Grand Rapids fixture set."></div>
+      <p class="print-caption">
+        <span>cycle_heat · --web --transparent-bg</span>
+        <span>42.96°N 85.67°W</span>
+      </p>
+    </figure>
+    <div class="filter-chips" role="group" aria-label="Activity type filter">
+      <button type="button" data-filter="all" aria-pressed="true">All types <span class="count" id="count-all">—</span></button>
+      <button type="button" data-filter="Ride" aria-pressed="false">Ride <span class="count" id="count-Ride">—</span></button>
+      <button type="button" data-filter="EBikeRide" aria-pressed="false">E-bike <span class="count" id="count-EBikeRide">—</span></button>
+      <button type="button" data-filter="Run" aria-pressed="false">Run <span class="count" id="count-Run">—</span></button>
+      <button type="button" data-filter="Walk" aria-pressed="false">Walk <span class="count" id="count-Walk">—</span></button>
+    </div>
+  </section>
+
+  <section>
+    <h2 class="section-title">Four themes</h2>
+    <p class="section-prose">
+      Same activity set, three of the four bundled themes. The
+      poster's character comes from the theme, not the data — switch
+      <code>--theme</code> and ship a different print of the same
+      year.
+    </p>
+    <figure class="diagram">
+      <img src="/example-gallery.png" alt="Three patinate renderings of the Grand Rapids fixture set, side by side: noir_heat (black canvas with orange heat trails), blueprint_heat (deep blue canvas with white routes), and warm_beige (paper canvas with dark ink and orange heat)." />
+      <p class="diagram-caption">noir_heat · blueprint_heat · warm_beige</p>
+    </figure>
+  </section>
+
+  <section>
+    <h2 class="section-title">How <code>patinate</code> is shaped</h2>
+    <div class="tile-grid">
+      <div class="tile">
+        <p class="tile-eyebrow">flow · in</p>
+        <p class="tile-headline">activities</p>
+        <p class="tile-prose">
+          Strava OAuth → polyline + segments + timestamps. Incremental
+          sync (only new activities since the last run), cached
+          locally as JSON. OSM basemap fetched once per city and
+          pinned by tile-bbox hash.
+        </p>
+        <p class="tile-meta">oauth · incremental · cached</p>
+      </div>
+      <div class="tile">
+        <p class="tile-eyebrow">discipline · posture</p>
+        <p class="tile-headline">private</p>
+        <p class="tile-prose">
+          Home-coordinate obfuscation: every polyline endpoint within
+          a configurable radius of your home is snapped to a point on
+          the radius circle, so the poster never reveals where you
+          live. Segment names stripped, athlete and gear IDs zeroed
+          in the bundled fixture.
+        </p>
+        <p class="tile-meta">circle-obfuscate · 1km+ default</p>
+      </div>
+      <div class="tile">
+        <p class="tile-eyebrow">flow · out</p>
+        <p class="tile-headline">posters</p>
+        <p class="tile-prose">
+          Stylized SVG (vector — print at any size) plus a PNG render
+          via <code>resvg</code>. Four themes ship in tree; each is a
+          single JSON file declaring road widths, colors, and
+          heat-stroke alpha so adding a fifth theme is a one-file
+          change.
+        </p>
+        <p class="tile-meta">noir · blueprint · warm-beige · cycle</p>
+      </div>
+      <div class="tile">
+        <p class="tile-eyebrow">discipline · lifetime</p>
+        <p class="tile-headline">local</p>
+        <p class="tile-prose">
+          One operator, one laptop, one set of Strava credentials. No
+          telemetry, no upload, no shared identifiers. The basemap is
+          OSM tiles cached on disk; the routes are yours; the
+          rendered poster is yours; the binary is the only process.
+        </p>
+        <p class="tile-meta">one operator · no telemetry</p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2 class="section-title">Install</h2>
+    <p class="section-prose">
+      Two ways to run <code>patinate</code>, in increasing order of
+      isolation from your day-to-day machine. Each release ships
+      cosign-signed binaries, a CycloneDX SBOM per architecture, and
+      a SLSA v1.0 provenance attestation, all verifiable against
+      GitLab's OIDC issuer.
+    </p>
+    <div class="tile-list">
+      <div class="tile">
+        <p class="tile-eyebrow">option a</p>
+        <h3 class="tile-headline">Cargo install</h3>
+        <pre>cargo install patinate</pre>
+        <p class="tile-prose">
+          Build from source against your local Rust toolchain. Needs
+          a C compiler for the resvg PNG path
+          (<code>build-essential</code> on Debian, <code>xcode-select --install</code>
+          on macOS). No external runtime deps. Best for contributors
+          and anyone who already runs Rust for other work.
+        </p>
+        <p class="tile-meta">rust 1.75+ · resvg · cc required</p>
+      </div>
+      <div class="tile">
+        <p class="tile-eyebrow">option b</p>
+        <h3 class="tile-headline">Prebuilt binary</h3>
+        <pre>curl -L -o patinate https://gitlab.com/dunn.dev/patinate/-/releases/permalink/latest/downloads/patinate-linux-amd64</pre>
+        <p class="tile-prose">
+          Cosign-signed binary from the
+          <a href="https://gitlab.com/dunn.dev/patinate/-/releases">releases page</a>.
+          Pair the download with the matching <code>.sig</code> and
+          verify against the GitLab OIDC issuer before running. The
+          hardened option that doesn't ask you to install a Rust
+          toolchain.
+        </p>
+        <p class="tile-meta">linux/amd64 · linux/arm64 · darwin/arm64 · cosign</p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2 class="section-title">Provenance</h2>
+    <p class="section-prose">
+      The plate above is the bundled <code>fixtures/activities.json</code>,
+      sourced from public Strava cycling and running segments for
+      Grand Rapids — not any rider's personal activity. Athlete IDs
+      are zeroed, gear IDs are placeholders, segment names are
+      generic identifiers. The repo ships zero real-rider data and
+      zero maintainer-attributable coordinates. The same applies to
+      anything you render: only the operator's own Strava activities
+      are touched, only on the operator's own machine.
+    </p>
+  </section>
+
+  <section>
+    <h2 class="section-title">Who this is for</h2>
+    <p class="section-prose">
+      A cyclist, runner, or walker who tracks on Strava and wants a
+      print of the year that doesn't depend on Strava continuing to
+      surface it. Cron a sync, render at the end of the year, frame
+      what you got. If your activities live somewhere else, or if
+      you're happy enough with Strava's own annual visualizations,
+      <code>patinate</code> is not for you.
+    </p>
+  </section>
+</Layout>
+
+<script>
+  (async () => {
+    const root = document.getElementById('heatmap');
+    if (!root) return;
+    let svg;
+    try {
+      const resp = await fetch('/heatmap-web.svg');
+      if (!resp.ok) throw new Error(`fetch heatmap-web.svg: ${resp.status}`);
+      root.innerHTML = await resp.text();
+      svg = root.querySelector('svg');
+      if (!svg) throw new Error('no <svg> element');
+      svg.removeAttribute('width');
+      svg.removeAttribute('height');
+      svg.setAttribute('preserveAspectRatio', 'xMidYMid slice');
+    } catch (err) {
+      root.innerHTML = `<p style="font-family:var(--font-mono); padding:2rem; color:#fff;">heatmap unavailable: ${(err as Error).message}</p>`;
+      return;
+    }
+
+    const paths = svg.querySelectorAll('.heat path[data-type]');
+    const counts: Record<string, number> = { all: paths.length };
+    paths.forEach((p) => {
+      const t = p.getAttribute('data-type') || '';
+      counts[t] = (counts[t] || 0) + 1;
+    });
+    for (const [type, n] of Object.entries(counts)) {
+      const el = document.getElementById(`count-${type}`);
+      if (el) el.textContent = String(n).padStart(3, '0');
+    }
+
+    const buttons = document.querySelectorAll<HTMLButtonElement>('[data-filter]');
+    const apply = (type: string) => {
+      paths.forEach((p) => {
+        const match = type === 'all' || p.getAttribute('data-type') === type;
+        (p as SVGPathElement).style.opacity = match ? '' : '0.06';
+      });
+    };
+    buttons.forEach((btn) => {
+      btn.addEventListener('click', () => {
+        buttons.forEach((b) => b.setAttribute('aria-pressed', String(b === btn)));
+        apply(btn.dataset.filter || 'all');
+      });
+    });
+  })();
+</script>

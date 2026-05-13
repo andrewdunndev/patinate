@@ -1,0 +1,21 @@
+# patinate.dunn.dev site — Cloudflare Worker with Static Assets.
+#
+# The Astro static build sits in dist/; wrangler ships it as the
+# worker's bound assets and the worker has no script entry, so
+# requests resolve directly to the assets.
+#
+# Custom-domain binding is declared inline below; the zone-side DNS
+# record needs to exist before the first deploy succeeds.
+
+name = "patinate"
+compatibility_date = "2026-05-10"
+workers_dev = false
+
+[[routes]]
+pattern = "patinate.dunn.dev"
+custom_domain = true
+zone_name = "dunn.dev"
+
+[assets]
+directory = "./dist"
+not_found_handling = "404-page"

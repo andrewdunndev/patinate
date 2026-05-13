@@ -2,15 +2,34 @@
 **/*.rs.bk
 Cargo.lock.bak
 
-# rendered output, reproducible from fixtures
+# rendered output at root, reproducible from fixtures. Brand-kit
+# SVGs (avatar/hero/favicon) and the brand composite (brand.png,
+# avatar.png) per the repository standard are exceptions and stay
+# tracked.
 /heatmap.svg
 /*.svg
-
-# design-session scratch images. Move to docs/ if any are worth keeping.
+!/avatar.svg
+!/hero.svg
+!/favicon.svg
 /*.png
 /*.webp
+!/avatar.png
+!/brand.png
 
 # build outputs from `make site` (GitLab Pages CI generates this fresh)
 /public
+
+# OSM basemap is large (~36MB) and cached in CI; regenerable via
+# `patinate fetch-osm` for any city. Local devs cache it; not
+# tracked in git.
+/fixtures/*.osm.json.gz
+
+# patinate.dunn.dev site build artifacts (web/ is an Astro project).
+# Keep the rendered heatmap fixture tracked so the deploy doesn't
+# require a Rust build in CI — Makefile target `make heatmap`
+# regenerates it from fixtures/ when patinate evolves.
+/web/node_modules/
+/web/dist/
+/web/.astro/
 
 .DS_Store

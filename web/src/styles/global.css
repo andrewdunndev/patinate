@@ -1,0 +1,455 @@
+/* patinate chrome — canonical web-starter from @dunn.dev/reference.
+   The palette stays on the estate tokens (moss accent, white bg)
+   for full conformance with tutti and bairn. Patinate's only
+   project-specific chrome is two surface treatments below:
+   (1) Cormorant Garamond on the hero title, an editorial nod from
+   the earlier print-plate site, and (2) the .diagram.print-frame
+   dark backing around the live heatmap embed, so the bright orange
+   heat trails on the rendered SVG carry the way they would on
+   actual printed stock. Both are additive — drop them and you have
+   the canonical chrome. */
+@import '@dunn.dev/reference/tokens/index.css';
+
+:root {
+  --font-display: 'Cormorant Garamond', 'EB Garamond', Georgia, serif;
+}
+
+.hero-title {
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-style: italic;
+  letter-spacing: -0.02em;
+}
+
+/* The heatmap embed sits in a dark print-plate frame against the
+   paper canvas — preserves the editorial print-edition feel of the
+   earlier site within the canonical .diagram pattern. */
+.diagram.print-frame {
+  background: #1a1410;
+  padding: var(--space-4) var(--space-4) var(--space-5);
+  border: 0;
+  border-radius: var(--radius);
+  box-shadow:
+    0 1px 0 rgba(0,0,0,0.06),
+    0 8px 28px rgba(60, 41, 20, 0.12),
+    0 2px 8px rgba(60, 41, 20, 0.08);
+  overflow: hidden;
+  position: relative;
+}
+.diagram.print-frame .print-num {
+  position: absolute;
+  top: var(--space-2);
+  left: var(--space-4);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  letter-spacing: 0.25em;
+  text-transform: uppercase;
+  color: rgba(244, 238, 220, 0.55);
+}
+.diagram.print-frame .print-num span { color: var(--accent); }
+.diagram.print-frame .heatmap-host {
+  background: #faf6ed;
+  margin-top: var(--space-3);
+  aspect-ratio: 3 / 4;
+  position: relative;
+  overflow: hidden;
+}
+.diagram.print-frame .heatmap-host svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  min-width: 0;
+}
+.diagram.print-frame .print-caption {
+  display: flex;
+  justify-content: space-between;
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: rgba(244, 238, 220, 0.55);
+  margin: var(--space-2) 0 0 0;
+}
+
+/* Filter chip strip beneath the print frame. Lifts the editorial
+   filter-list from the earlier site into the canonical chrome's
+   tile vocabulary. */
+.filter-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin: var(--space-3) 0 var(--space-5);
+}
+.filter-chips button {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius);
+  cursor: pointer;
+  transition: color 120ms ease, border-color 120ms ease;
+}
+.filter-chips button:hover { color: var(--accent); border-color: var(--accent); }
+.filter-chips button[aria-pressed="true"] {
+  color: var(--bg);
+  background: var(--accent);
+  border-color: var(--accent);
+}
+.filter-chips .count {
+  margin-left: var(--space-2);
+  font-style: normal;
+  opacity: 0.7;
+}
+
+* { box-sizing: border-box; }
+
+html {
+  /* Most consumer sites pin to light so diagrams and SVG art keep
+     authored contrast across visitor color-scheme preferences. See
+     reference's design-system standard, section "Light/dark
+     pinning", for when to drop this and respect-system instead. */
+  color-scheme: light;
+  background: var(--surface);
+  color: var(--text);
+  font-family: var(--font-body);
+  font-size: 16px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+code, pre { font-family: var(--font-mono); font-size: 0.92em; }
+pre {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: var(--space-3);
+  overflow-x: auto;
+  font-size: var(--text-sm);
+}
+code:not(pre code) {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 0.05rem 0.3rem;
+  font-size: 0.85em;
+}
+
+/* ── chrome: header + footer + page wrapper ────────────────────── */
+
+.site-header {
+  border-bottom: 1px solid var(--border);
+  background: var(--bg);
+}
+.site-header-inner {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: var(--space-4) var(--space-5);
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-5);
+}
+.brand {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: var(--text-md);
+  color: var(--text);
+  letter-spacing: -0.01em;
+}
+.brand-name { color: var(--accent); }
+.site-nav {
+  margin-left: auto;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-4);
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  letter-spacing: 0.04em;
+}
+.site-nav a {
+  color: var(--text-muted);
+  text-transform: uppercase;
+}
+.site-nav a:hover, .site-nav a.active { color: var(--accent); text-decoration: none; }
+
+main.page {
+  flex: 1;
+  width: 100%;
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: var(--space-6) var(--space-5);
+}
+
+.site-footer {
+  border-top: 1px solid var(--border);
+  background: var(--bg);
+  padding: var(--space-4) var(--space-5);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.site-footer-inner {
+  max-width: 1100px;
+  margin: 0 auto;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: var(--space-1) var(--space-4);
+}
+
+/* ── hero: fluid title, decorative glyph upper-right, CTA pair ── */
+
+.page-eyebrow {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--text-muted);
+  margin: 0 0 var(--space-2) 0;
+}
+.hero {
+  position: relative;
+  padding: var(--space-7) 0 var(--space-6) 0;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: var(--space-7);
+}
+.hero-glyph {
+  position: absolute;
+  top: var(--space-7);
+  right: 0;
+  width: 180px;
+  height: auto;
+  opacity: 0.95;
+}
+.hero-title {
+  font-size: clamp(3.5rem, 8vw, 6rem);
+  font-weight: 700;
+  margin: 0 0 var(--space-3) 0;
+  color: var(--accent);
+  letter-spacing: -0.04em;
+  line-height: 1;
+}
+.hero-lede {
+  font-size: var(--text-xl);
+  color: var(--text-2);
+  max-width: 60ch;
+  margin: 0 0 var(--space-3) 0;
+  line-height: 1.45;
+}
+.hero-lede em { color: var(--text); font-style: normal; font-weight: 600; }
+.hero-tagline {
+  font-style: italic;
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+  margin: 0 0 var(--space-5) 0;
+}
+.hero-cta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+}
+
+.cta-primary {
+  display: inline-block;
+  padding: var(--space-3) var(--space-5);
+  background: var(--accent);
+  color: var(--bg);
+  border-radius: var(--radius);
+  font-weight: 600;
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  letter-spacing: 0.04em;
+}
+.cta-primary:hover { background: var(--dd-moss-500); text-decoration: none; }
+.cta-secondary {
+  display: inline-block;
+  padding: var(--space-3) var(--space-5);
+  background: transparent;
+  color: var(--accent);
+  border: 1px solid var(--accent);
+  border-radius: var(--radius);
+  font-weight: 600;
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  letter-spacing: 0.04em;
+}
+.cta-secondary:hover { background: var(--surface); text-decoration: none; }
+
+/* ── sections: title + prose with breathing room ───────────────── */
+
+.section { margin: var(--space-7) 0 var(--space-5) 0; }
+.section-title {
+  font-size: var(--text-2xl);
+  font-weight: 700;
+  color: var(--text);
+  margin: var(--space-7) 0 var(--space-4) 0;
+  letter-spacing: -0.015em;
+}
+.section-prose {
+  /* No max-width — prose fills the page column so it matches the
+     width of every diagram, pillar grid, and pre block beneath it.
+     Page width itself is the single content-column constraint. */
+  color: var(--text-2);
+  margin: 0 0 var(--space-3) 0;
+  font-size: var(--text-md);
+  line-height: 1.6;
+}
+.section-prose em { color: var(--text); font-style: italic; font-weight: 500; }
+.section-prose code { font-size: 0.85em; }
+
+/* ── diagrams: paper-card frame around an inline SVG ───────────── */
+
+.diagram {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: var(--space-4);
+  margin: var(--space-4) 0;
+  /* On narrow viewports the diagram keeps its natural width and the
+     frame horizontal-scrolls. Letting the SVG shrink to viewport
+     width is the failure mode this overflow handles — tutti's
+     sequence diagram at 1100x720 becomes illegible below ~720px. */
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+.diagram img, .diagram svg {
+  width: 100%;
+  height: auto;
+  display: block;
+  /* Floor the rendered width so detail-rich diagrams stay legible
+     on mobile. Diagrams wider than this naturally extend the
+     horizontal-scroll surface; diagrams narrower than this render
+     at their natural size. */
+  min-width: 640px;
+}
+.diagram-caption {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  margin: var(--space-3) 0 0 0;
+}
+
+/* ── tiles: labeled rectangle as a primitive, two layouts ──────────
+   .tile is the unit (eyebrow + headline + prose + meta). Layout
+   wrappers pick the geometry:
+
+     .tile-grid  — 2-column grid, for "the data-sheet" pattern
+                   that mirrors the hero.svg tile cluster (four
+                   facets of one thing).
+     .tile-list  — single-column stack of wide rectangles, for
+                   ordered narrative (failure modes, install
+                   variants, decision log) where each item wants
+                   its own row and the reader is meant to scan
+                   top-to-bottom.
+
+   Pick the layout by intent: a fixed N-up panel of comparable
+   facets → grid; a numbered or chronologically ordered sequence
+   → list. */
+
+.tile-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: var(--space-3);
+  margin: var(--space-4) 0;
+}
+.tile-list {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-3);
+  margin: var(--space-4) 0;
+}
+.tile {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: var(--space-4);
+  background: var(--bg);
+}
+.tile-eyebrow {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin: 0 0 var(--space-1) 0;
+}
+.tile-headline {
+  font-size: var(--text-xl);
+  font-weight: 700;
+  color: var(--accent);
+  margin: 0 0 var(--space-2) 0;
+  letter-spacing: -0.015em;
+  line-height: 1.15;
+}
+.tile-grid .tile-headline { font-size: var(--text-2xl); }
+.tile-prose {
+  font-size: var(--text-sm);
+  color: var(--text-2);
+  margin: 0 0 var(--space-2) 0;
+  line-height: 1.55;
+}
+.tile-meta {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin: 0;
+}
+.tile pre {
+  margin: var(--space-2) 0;
+}
+
+/* ── callout: a quoted reference (essay, decision record, etc.) ── */
+
+blockquote.callout {
+  margin: var(--space-4) 0;
+  padding: var(--space-3) var(--space-4);
+  border-left: 3px solid var(--accent);
+  background: var(--bg);
+  color: var(--text);
+  font-size: var(--text-md);
+}
+blockquote.callout cite {
+  display: block;
+  margin-top: var(--space-2);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  font-style: normal;
+}
+
+/* ── narrow viewports ───────────────────────────────────────────── */
+
+@media (max-width: 720px) {
+  .hero-glyph { position: static; width: 120px; margin-bottom: var(--space-4); }
+  .hero { padding-top: var(--space-5); }
+}
+@media (max-width: 640px) {
+  .tile-grid { grid-template-columns: 1fr; }
+  .site-header-inner { padding: var(--space-3) var(--space-4); gap: var(--space-2); }
+  .site-nav { margin-left: 0; width: 100%; gap: var(--space-2) var(--space-3); }
+  main.page { padding: var(--space-5) var(--space-4); }
+  .site-footer { padding: var(--space-3) var(--space-4); }
+}

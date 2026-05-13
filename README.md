@@ -1,6 +1,6 @@
-# patinate
+![hero](hero.svg)
 
-![Grand Rapids, three themes: noir_heat, blueprint_heat, warm_beige](assets/example-gallery.png)
+# patinate
 
 [![pipeline](https://gitlab.com/dunn.dev/patinate/badges/main/pipeline.svg)](https://gitlab.com/dunn.dev/patinate/-/pipelines)
 [![license](https://img.shields.io/badge/license-MIT-green)](LICENSE)
@@ -10,7 +10,9 @@ Render Strava activity into stylized heatmap posters and inline SVG.
 The patina builds where you ride often: overlapping low-alpha strokes
 accumulate into brighter color the way actual patina builds on metal.
 
-The hero above is the bundled `fixtures/activities.json`, sourced from
+![Grand Rapids, three themes: noir_heat, blueprint_heat, warm_beige](assets/example-gallery.png)
+
+The gallery above is the bundled `fixtures/activities.json`, sourced from
 public Strava cycling and running segments for Grand Rapids. Athlete
 IDs are zeroed, gear IDs are placeholders, segment names are generic
 identifiers. The repo ships zero real-rider data and zero

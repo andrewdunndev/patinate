@@ -79,47 +79,25 @@ include:
 audit:
   allow_failure: false
 
-# GitLab Pages: render the bundled fixture in --web mode and serve
-# the editorial demo. Only deploys from main.
+# patinate.dunn.dev site at web/ — canonical web-starter Astro
+# scaffold per @dunn.dev/reference. Cloudflare Worker with bound
+# static assets, custom-domain binding declared in wrangler.toml.
+# Build runs on every push + MR; deploy runs only on main.
 #
-# Privacy: the demo renders fixtures/activities.json, which is
-# public Strava segment polylines (athlete IDs zeroed, gear IDs
-# placeholders, names generic). No real-rider identifiers ship.
-pages:
-  stage: deploy
-  image: registry.gitlab.com/dunn.dev/pipeline/ci-rust:2.1.0
-  cache:
-    - key: cargo-registry-${CI_COMMIT_REF_SLUG}
-      paths:
-        - .cargo/registry/cache
-        - .cargo/registry/index
-      policy: pull-push
-    - key: cargo-target-${CI_COMMIT_REF_SLUG}
-      paths:
-        - target/
-      policy: pull-push
-    - key: osm-${CI_PROJECT_ID}
-      paths:
-        - fixtures/grand-rapids.osm.json.gz
-      policy: pull-push
-  script:
-    - cargo build --release
-    - mkdir -p fixtures public
-    # OSM fixture is fetched on first run, cached thereafter via the
-    # osm-${CI_PROJECT_ID} cache key.
-    - test -f fixtures/grand-rapids.osm.json.gz
-        || ./target/release/patinate fetch-osm --city "Grand Rapids" --radius-m 25000
-             --out fixtures/grand-rapids.osm.json.gz
-    - ./target/release/patinate render
-        --config fixtures/config.toml
-        --osm fixtures/grand-rapids.osm.json.gz
-        --activities fixtures/activities.json
-        --theme cycle_heat
-        --web --transparent-bg
-        --out public/heatmap-web.svg
-    - cp examples/site/index.html public/index.html
-  artifacts:
-    paths:
-      - public
-  rules:
-    - if: $CI_COMMIT_BRANCH == "main"
+# The live heatmap embed (web/public/heatmap-web.svg) is committed
+# to the repo (rendered locally via `make heatmap` from
+# fixtures/activities.json + the cached OSM basemap), so the deploy
+# pipeline doesn't need a Rust build. Regenerate the heatmap when
+# fixtures change or theme renderer changes; see the Makefile.
+#
+# Privacy: the bundled fixture is public Strava segment polylines
+# (athlete IDs zeroed, gear IDs placeholders, names generic). No
+# real-rider identifiers ship.
+- component: gitlab.com/dunn.dev/pipeline/cloudflare-worker@2.2.3
+  inputs:
+    wrangler_config: web/wrangler.toml
+    build_command: npm run build
+    output_dir: web/dist
+    needs_npm_install: true
+    npm_dir: web
+    production_url: https://patinate.dunn.dev

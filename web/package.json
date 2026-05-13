@@ -1,0 +1,20 @@
+{
+  "name": "patinate-web",
+  "type": "module",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Static one-page site for patinate at patinate.dunn.dev. Consumes @dunn.dev/reference for tokens.",
+  "scripts": {
+    "dev": "astro dev",
+    "start": "astro dev",
+    "build": "astro check && astro build",
+    "preview": "astro preview",
+    "astro": "astro"
+  },
+  "dependencies": {
+    "@astrojs/check": "^0.9.4",
+    "@dunn.dev/reference": "^0.1.0",
+    "astro": "^5.7.4",
+    "typescript": "^5.6.3"
+  }
+}
