@@ -1,0 +1,76 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 920" role="img" aria-label="patinate runs as four CLI commands in sequence. patinate auth performs a one-time OAuth handshake with Strava and writes a refresh token to the local config. patinate fetch-osm pulls the city basemap from the Overpass API once per city. patinate sync pulls new activities from Strava into a local SQLite cache, incrementally on every run. patinate render combines the config, OSM basemap, and cached activities into an SVG or PNG poster.">
+  <style>
+    .stage rect.box { fill: #ffffff; stroke: #4a6741; stroke-width: 1.5; }
+    .stage .cmd { font: 700 18px 'IBM Plex Mono', Menlo, monospace; fill: #4a6741; }
+    .stage .stage-no { font: 600 10px 'IBM Plex Mono', Menlo, monospace; fill: #707070; letter-spacing: 0.16em; text-transform: uppercase; }
+    .stage .freq { font: 600 10px 'IBM Plex Mono', Menlo, monospace; fill: #707070; letter-spacing: 0.08em; text-transform: uppercase; }
+    .stage .from, .stage .to { font: 500 9px 'IBM Plex Mono', Menlo, monospace; fill: #707070; letter-spacing: 0.06em; text-transform: uppercase; }
+    .stage .from-val, .stage .to-val { font: 500 11px 'IBM Plex Sans', system-ui, sans-serif; fill: #404040; }
+    .arr { stroke: #4a6741; stroke-width: 1.6; fill: none; }
+    .arr-head { fill: #4a6741; }
+    .sep { stroke: #c4b99a; stroke-width: 0.8; stroke-dasharray: 3 2; fill: none; }
+    .footer-callout { font: 600 11px 'IBM Plex Mono', Menlo, monospace; fill: #707070; letter-spacing: 0.1em; text-transform: uppercase; text-anchor: middle; }
+  </style>
+
+  <!-- stage 1: auth -->
+  <g class="stage">
+    <rect class="box" x="40" y="20" width="320" height="170" rx="4"/>
+    <text class="stage-no" x="60" y="46">stage 1</text>
+    <text class="cmd" x="60" y="78">patinate auth</text>
+    <text class="freq" x="60" y="98">once · refreshed</text>
+    <line class="sep" x1="60" y1="124" x2="340" y2="124"/>
+    <text class="from" x="60" y="144">from</text>
+    <text class="from-val" x="60" y="160">Strava OAuth</text>
+    <text class="to" x="220" y="144">writes</text>
+    <text class="to-val" x="220" y="160">config · token</text>
+  </g>
+  <line class="arr" x1="200" y1="190" x2="200" y2="218"/>
+  <polygon class="arr-head" points="200,220 195,212 205,212"/>
+
+  <!-- stage 2: fetch-osm -->
+  <g class="stage">
+    <rect class="box" x="40" y="230" width="320" height="170" rx="4"/>
+    <text class="stage-no" x="60" y="256">stage 2</text>
+    <text class="cmd" x="60" y="288">patinate fetch-osm</text>
+    <text class="freq" x="60" y="308">once · per city</text>
+    <line class="sep" x1="60" y1="334" x2="340" y2="334"/>
+    <text class="from" x="60" y="354">from</text>
+    <text class="from-val" x="60" y="370">Overpass · OSM</text>
+    <text class="to" x="220" y="354">writes</text>
+    <text class="to-val" x="220" y="370">OSM cache</text>
+  </g>
+  <line class="arr" x1="200" y1="400" x2="200" y2="428"/>
+  <polygon class="arr-head" points="200,430 195,422 205,422"/>
+
+  <!-- stage 3: sync -->
+  <g class="stage">
+    <rect class="box" x="40" y="440" width="320" height="170" rx="4"/>
+    <text class="stage-no" x="60" y="466">stage 3</text>
+    <text class="cmd" x="60" y="498">patinate sync</text>
+    <text class="freq" x="60" y="518">incremental · ongoing</text>
+    <line class="sep" x1="60" y1="544" x2="340" y2="544"/>
+    <text class="from" x="60" y="564">from</text>
+    <text class="from-val" x="60" y="580">Strava Activities</text>
+    <text class="to" x="220" y="564">writes</text>
+    <text class="to-val" x="220" y="580">activity cache</text>
+  </g>
+  <line class="arr" x1="200" y1="610" x2="200" y2="638"/>
+  <polygon class="arr-head" points="200,640 195,632 205,632"/>
+
+  <!-- stage 4: render -->
+  <g class="stage">
+    <rect class="box" x="40" y="650" width="320" height="170" rx="4"/>
+    <text class="stage-no" x="60" y="676">stage 4</text>
+    <text class="cmd" x="60" y="708">patinate render</text>
+    <text class="freq" x="60" y="728">on demand</text>
+    <line class="sep" x1="60" y1="754" x2="340" y2="754"/>
+    <text class="from" x="60" y="774">reads</text>
+    <text class="from-val" x="60" y="790">all three caches</text>
+    <text class="to" x="220" y="774">writes</text>
+    <text class="to-val" x="220" y="790">poster · svg · png</text>
+  </g>
+
+  <!-- footer callout -->
+  <text class="footer-callout" x="200" y="870">four commands</text>
+  <text class="footer-callout" x="200" y="890">three caches · one poster</text>
+</svg>

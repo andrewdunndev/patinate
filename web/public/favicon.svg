@@ -1,20 +1,16 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="patinate: a heat trail building over a city grid.">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="patinate: a heat trail crossing a city grid.">
   <g stroke="#4a6741" fill="none" stroke-linecap="round">
-    <!-- light street grid -->
-    <line x1="8"  y1="20" x2="56" y2="20" stroke-width="1"/>
-    <line x1="8"  y1="32" x2="56" y2="32" stroke-width="1"/>
-    <line x1="8"  y1="44" x2="56" y2="44" stroke-width="1"/>
-    <line x1="20" y1="8"  x2="20" y2="56" stroke-width="1"/>
-    <line x1="32" y1="8"  x2="32" y2="56" stroke-width="1"/>
-    <line x1="44" y1="8"  x2="44" y2="56" stroke-width="1"/>
-    <!-- arterials -->
-    <line x1="8"  y1="32" x2="56" y2="32" stroke-width="2"/>
-    <line x1="32" y1="8"  x2="32" y2="56" stroke-width="2"/>
-    <!-- heat trail (three stacked strokes for the patina build) -->
-    <path d="M 12 50 Q 24 42, 32 32 T 52 16" stroke-width="6" opacity="0.18"/>
-    <path d="M 12 50 Q 24 42, 32 32 T 52 16" stroke-width="3.5" opacity="0.5"/>
-    <path d="M 12 50 Q 24 42, 32 32 T 52 16" stroke-width="1.8" opacity="1"/>
+    <!-- thin street grid: 3 each direction -->
+    <line x1="8"  y1="20" x2="56" y2="20" stroke-width="0.6"/>
+    <line x1="8"  y1="44" x2="56" y2="44" stroke-width="0.6"/>
+    <line x1="20" y1="8"  x2="20" y2="56" stroke-width="0.6"/>
+    <line x1="44" y1="8"  x2="44" y2="56" stroke-width="0.6"/>
+    <!-- arterials: one horizontal + one vertical through the middle -->
+    <line x1="8"  y1="32" x2="56" y2="32" stroke-width="1.5"/>
+    <line x1="32" y1="8"  x2="32" y2="56" stroke-width="1.5"/>
+    <!-- single heat trail, one clean stroke -->
+    <path d="M 14 50 Q 24 42, 32 32 T 52 14" stroke-width="1.8"/>
   </g>
-  <!-- home dot -->
-  <circle cx="12" cy="50" r="2.4" fill="#4a6741"/>
+  <!-- home dot anchoring the trail -->
+  <circle cx="14" cy="50" r="2.2" fill="#4a6741"/>
 </svg>

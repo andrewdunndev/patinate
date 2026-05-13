@@ -19,46 +19,33 @@ import Layout from '../layouts/Layout.astro';
   </header>
 
   <section>
-    <h2 class="section-title">Plate i. — Grand Rapids</h2>
+    <h2 class="section-title">How it runs</h2>
     <p class="section-prose">
-      The print below is the bundled <code>fixtures/activities.json</code>
-      rendered live with <code>patinate render --theme cycle_heat --web --transparent-bg</code>.
-      Filter by activity type to fade the rest into the patina, the
-      way overlapping strokes accumulate when you ride.
+      Patinate is four small commands that pipe into each other. The
+      design intent is that no part of it owns long-running state of
+      its own — Strava and OpenStreetMap own the upstream data, your
+      disk owns the cache, and the renderer is a pure function of
+      what's on disk at the moment you run it. You should be able to
+      delete <code>~/.config/patinate</code>, re-run the four
+      commands, and get a poster byte-equivalent to the one you had
+      yesterday.
     </p>
-    <figure class="diagram print-frame">
-      <p class="print-num"><span>plate i.</span> · grand rapids, mi · usa</p>
-      <div class="heatmap-host" id="heatmap" aria-label="Live patinate heatmap rendering of the Grand Rapids fixture set."></div>
-      <p class="print-caption">
-        <span>cycle_heat · --web --transparent-bg</span>
-        <span>42.96°N 85.67°W</span>
-      </p>
+    <figure class="diagram pipeline-figure">
+      <img class="pipeline-wide" src="/pipeline.svg" alt="Pipeline diagram. Four CLI commands run left to right. patinate auth performs a one-time OAuth handshake with Strava and writes a refresh token into the local config. patinate fetch-osm pulls the city basemap from the Overpass API once per city and writes a gzipped JSON cache. patinate sync pulls new activities from Strava into a local SQLite cache, incrementally on every run. patinate render reads the config, the OSM cache, and the activity cache and writes a poster as SVG or PNG." />
+      <img class="pipeline-narrow" src="/pipeline-narrow.svg" alt="Pipeline diagram. Four CLI commands stacked top-to-bottom. patinate auth performs a one-time OAuth handshake with Strava and writes a refresh token into the local config. patinate fetch-osm pulls the city basemap from the Overpass API once per city and writes a gzipped JSON cache. patinate sync pulls new activities from Strava into a local SQLite cache, incrementally on every run. patinate render reads all three caches and writes a poster as SVG or PNG." />
+      <p class="diagram-caption">four commands · three caches · one poster</p>
     </figure>
-    <div class="filter-chips" role="group" aria-label="Activity type filter">
-      <button type="button" data-filter="all" aria-pressed="true">All types <span class="count" id="count-all">—</span></button>
-      <button type="button" data-filter="Ride" aria-pressed="false">Ride <span class="count" id="count-Ride">—</span></button>
-      <button type="button" data-filter="EBikeRide" aria-pressed="false">E-bike <span class="count" id="count-EBikeRide">—</span></button>
-      <button type="button" data-filter="Run" aria-pressed="false">Run <span class="count" id="count-Run">—</span></button>
-      <button type="button" data-filter="Walk" aria-pressed="false">Walk <span class="count" id="count-Walk">—</span></button>
-    </div>
-  </section>
-
-  <section>
-    <h2 class="section-title">Four themes</h2>
     <p class="section-prose">
-      Same activity set, three of the four bundled themes. The
-      poster's character comes from the theme, not the data — switch
-      <code>--theme</code> and ship a different print of the same
-      year.
+      <code>auth</code> runs once, writes a refresh token; from then
+      on the cached token quietly re-rolls. <code>fetch-osm</code>
+      runs once per city — the basemap is just streets and water and
+      doesn't change between two of your rides. <code>sync</code> is
+      the only command you re-run often; it walks the Strava
+      activities API one page at a time at human pace and only pulls
+      what's new since last time. <code>render</code> reads all
+      three caches and composes the poster — no network calls, no
+      surprises, theme picked by flag.
     </p>
-    <figure class="diagram">
-      <img src="/example-gallery.png" alt="Three patinate renderings of the Grand Rapids fixture set, side by side: noir_heat (black canvas with orange heat trails), blueprint_heat (deep blue canvas with white routes), and warm_beige (paper canvas with dark ink and orange heat)." />
-      <p class="diagram-caption">noir_heat · blueprint_heat · warm_beige</p>
-    </figure>
-  </section>
-
-  <section>
-    <h2 class="section-title">How <code>patinate</code> is shaped</h2>
     <div class="tile-grid">
       <div class="tile">
         <p class="tile-eyebrow">flow · in</p>
@@ -106,6 +93,74 @@ import Layout from '../layouts/Layout.astro';
         </p>
         <p class="tile-meta">one operator · no telemetry</p>
       </div>
+    </div>
+  </section>
+
+  <section>
+    <h2 class="section-title">A year on the map</h2>
+    <p class="section-prose">
+      The bundled fixture rendered live with
+      <code>patinate render --theme cycle_heat --web --transparent-bg</code>.
+      Filter by activity type to fade the rest into the patina, the
+      way overlapping strokes accumulate when you ride.
+    </p>
+    <figure class="diagram print-frame">
+      <div class="heatmap-host" id="heatmap" aria-label="Live patinate heatmap rendering of the Grand Rapids fixture set."></div>
+      <p class="print-caption">
+        <span>cycle_heat · --web --transparent-bg</span>
+        <span>42.96°N 85.67°W</span>
+      </p>
+    </figure>
+    <div class="filter-chips" role="group" aria-label="Activity type filter">
+      <button type="button" data-filter="all" aria-pressed="true">All types <span class="count" id="count-all">—</span></button>
+      <button type="button" data-filter="Ride" aria-pressed="false">Ride <span class="count" id="count-Ride">—</span></button>
+      <button type="button" data-filter="EBikeRide" aria-pressed="false">E-bike <span class="count" id="count-EBikeRide">—</span></button>
+      <button type="button" data-filter="Run" aria-pressed="false">Run <span class="count" id="count-Run">—</span></button>
+      <button type="button" data-filter="Walk" aria-pressed="false">Walk <span class="count" id="count-Walk">—</span></button>
+    </div>
+  </section>
+
+  <section>
+    <h2 class="section-title">Four themes</h2>
+    <p class="section-prose">
+      The same Grand Rapids fixture rendered through each of the
+      four bundled themes. Pick one with <code>--theme &lt;name&gt;</code>;
+      ship a different print of the same year by changing only the
+      flag.
+    </p>
+    <div class="tile-grid">
+      <figure class="tile theme-tile">
+        <img src="/theme-noir_heat.png" alt="patinate render with the noir_heat theme: a black canvas with orange heat trails over a dim white road network." />
+        <figcaption>
+          <p class="tile-eyebrow">theme</p>
+          <p class="tile-headline">noir_heat</p>
+          <p class="tile-prose">Black canvas, orange heat. The high-contrast print.</p>
+        </figcaption>
+      </figure>
+      <figure class="tile theme-tile">
+        <img src="/theme-blueprint_heat.png" alt="patinate render with the blueprint_heat theme: a deep blue canvas with white routes." />
+        <figcaption>
+          <p class="tile-eyebrow">theme</p>
+          <p class="tile-headline">blueprint_heat</p>
+          <p class="tile-prose">Deep blue canvas, white routes. The engineering-drawing print.</p>
+        </figcaption>
+      </figure>
+      <figure class="tile theme-tile">
+        <img src="/theme-warm_beige.png" alt="patinate render with the warm_beige theme: a paper-warm canvas with dark ink roads and orange heat." />
+        <figcaption>
+          <p class="tile-eyebrow">theme</p>
+          <p class="tile-headline">warm_beige</p>
+          <p class="tile-prose">Paper canvas, dark ink, orange heat. The annual-report print.</p>
+        </figcaption>
+      </figure>
+      <figure class="tile theme-tile">
+        <img src="/theme-cycle_heat.png" alt="patinate render with the cycle_heat theme: a cream canvas with steel-blue heat over light tan roads." />
+        <figcaption>
+          <p class="tile-eyebrow">theme</p>
+          <p class="tile-headline">cycle_heat</p>
+          <p class="tile-prose">Cream canvas, steel-blue heat. The editorial print.</p>
+        </figcaption>
+      </figure>
     </div>
   </section>
 
@@ -167,11 +222,90 @@ import Layout from '../layouts/Layout.astro';
     <h2 class="section-title">Who this is for</h2>
     <p class="section-prose">
       A cyclist, runner, or walker who tracks on Strava and wants a
-      print of the year that doesn't depend on Strava continuing to
-      surface it. Cron a sync, render at the end of the year, frame
-      what you got. If your activities live somewhere else, or if
-      you're happy enough with Strava's own annual visualizations,
-      <code>patinate</code> is not for you.
+      <em>specific image</em> — a poster of the year, an end-of-month
+      snapshot for a holiday card, a printed map of the streets they
+      know by feet. <code>patinate render</code> makes the image once;
+      what you do with it (frame it, print it, embed it on a page
+      that refreshes every Sunday) is up to you. The
+      <code>--web --transparent-bg</code> flags exist precisely so a
+      scheduled run can drop a fresh SVG into a site's static assets.
+    </p>
+    <p class="section-prose">
+      If your activities live somewhere else, or if you're happy
+      enough with Strava's own annual visualizations,
+      <code>patinate</code> is not for you. It's also not a
+      visualization service — there is no upload, no shared
+      identifier, no aggregation across riders. One operator, one
+      laptop, one poster.
+    </p>
+  </section>
+
+  <section>
+    <h2 class="section-title">Collaborate</h2>
+    <p class="section-prose">
+      <code>patinate</code> ships small on purpose, but the surface
+      is wide. There are obvious next moves the maintainer hasn't
+      gotten to yet, and they're all good first issues if you want
+      to send a patch.
+    </p>
+    <div class="tile-list">
+      <div class="tile">
+        <p class="tile-eyebrow">contribute</p>
+        <h3 class="tile-headline">a fifth theme</h3>
+        <p class="tile-prose">
+          Themes are single JSON files declaring road widths, colors,
+          and heat-stroke alpha. <code>themes/your_idea.json</code>
+          plus a screenshot in the MR is the whole change. The four
+          shipping themes cover noir, blueprint, paper, and
+          editorial — what's missing is a high-contrast print, a
+          full-color terrain, a single-route minimalist poster.
+        </p>
+        <p class="tile-meta">themes/*.json · one file · drop a screenshot</p>
+      </div>
+      <div class="tile">
+        <p class="tile-eyebrow">contribute</p>
+        <h3 class="tile-headline">a non-Strava source</h3>
+        <p class="tile-prose">
+          The sync layer is a thin adapter that walks an activities
+          API and writes polylines into the cache. A second adapter
+          for Garmin Connect, Komoot, RideWithGPS, or a self-hosted
+          source would let the same render pipeline serve a wider
+          audience. The renderer doesn't care where the polylines
+          came from.
+        </p>
+        <p class="tile-meta">src/strava → src/sources/*</p>
+      </div>
+      <div class="tile">
+        <p class="tile-eyebrow">contribute</p>
+        <h3 class="tile-headline">a second basemap</h3>
+        <p class="tile-prose">
+          OSM via Overpass is the only basemap source today. A
+          Mapbox or Maplibre-vector adapter would unlock fancier
+          typographic basemaps; a custom hand-drawn SVG basemap
+          adapter would unlock printed-art posters of your home
+          neighborhood with no roads at all, just the heat.
+        </p>
+        <p class="tile-meta">src/osm → src/basemap/*</p>
+      </div>
+      <div class="tile">
+        <p class="tile-eyebrow">contribute</p>
+        <h3 class="tile-headline">an issue, a fixture, a print</h3>
+        <p class="tile-prose">
+          If you ran patinate and the output surprised you, file an
+          <a href="https://gitlab.com/dunn.dev/patinate/-/issues">issue</a>
+          with the theme name and the activity-type counts. If you
+          made a poster you like, send a low-resolution screenshot
+          for the gallery. Either way, you'll be making the next
+          person's first run smoother.
+        </p>
+        <p class="tile-meta">issues · gallery · fixtures</p>
+      </div>
+    </div>
+    <p class="section-prose" style="margin-top: var(--space-5)">
+      Read <a href="https://gitlab.com/dunn.dev/patinate/-/blob/main/CONTRIBUTING.md">CONTRIBUTING.md</a>
+      before sending the first patch — it covers the privacy posture
+      (no real-rider coordinates in test fixtures, ever) and the
+      release shape. Then open an MR; small ones land fast.
     </p>
   </section>
 </Layout>

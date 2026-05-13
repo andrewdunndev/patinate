@@ -1,0 +1,111 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1080 360" role="img" aria-label="patinate runs as four CLI commands in sequence. auth performs a one-time OAuth handshake with Strava that writes a refresh token into the local config. fetch-osm pulls the city basemap from the Overpass API once per city. sync pulls new activities from Strava into a local cache, incrementally on every run. render combines the config, OSM basemap, and cached activities into an SVG or PNG poster on disk.">
+  <style>
+    .stage rect { fill: #ffffff; stroke: #4a6741; stroke-width: 1.5; }
+    .stage .cmd { font: 700 13px 'IBM Plex Mono', Menlo, monospace; fill: #4a6741; }
+    .stage .freq { font: 600 9px 'IBM Plex Mono', Menlo, monospace; fill: #707070; letter-spacing: 0.08em; text-transform: uppercase; }
+    .stage .desc { font: 400 11px 'IBM Plex Sans', system-ui, sans-serif; fill: #404040; }
+    .src rect { fill: #f4f4f4; stroke: #c4c4c4; stroke-width: 1; stroke-dasharray: 3 2; }
+    .src text { font: 600 9px 'IBM Plex Mono', Menlo, monospace; fill: #707070; letter-spacing: 0.06em; text-transform: uppercase; }
+    .arr { stroke: #4a6741; stroke-width: 1.5; fill: none; }
+    .arr-head { fill: #4a6741; }
+    .arr-data { stroke: #707070; stroke-width: 1; fill: none; stroke-dasharray: 3 2; }
+    .arr-data-head { fill: #707070; }
+    .label { font: 500 9px 'IBM Plex Sans', system-ui, sans-serif; fill: #707070; }
+  </style>
+
+  <!-- External sources/sinks (top row) -->
+  <g class="src">
+    <rect x="60" y="20" width="160" height="50" rx="3"/>
+    <text x="140" y="42" text-anchor="middle">STRAVA</text>
+    <text x="140" y="56" text-anchor="middle">OAUTH ENDPOINT</text>
+  </g>
+  <g class="src">
+    <rect x="280" y="20" width="160" height="50" rx="3"/>
+    <text x="360" y="42" text-anchor="middle">OVERPASS API</text>
+    <text x="360" y="56" text-anchor="middle">OPENSTREETMAP</text>
+  </g>
+  <g class="src">
+    <rect x="500" y="20" width="160" height="50" rx="3"/>
+    <text x="580" y="42" text-anchor="middle">STRAVA</text>
+    <text x="580" y="56" text-anchor="middle">ACTIVITIES API</text>
+  </g>
+
+  <!-- Four CLI stages (middle row) -->
+  <g class="stage">
+    <rect x="60" y="140" width="160" height="80" rx="3"/>
+    <text class="cmd" x="140" y="166" text-anchor="middle">patinate auth</text>
+    <text class="freq" x="140" y="183" text-anchor="middle">once · refreshed</text>
+    <text class="desc" x="140" y="204" text-anchor="middle">OAuth handshake</text>
+  </g>
+  <g class="stage">
+    <rect x="280" y="140" width="160" height="80" rx="3"/>
+    <text class="cmd" x="360" y="166" text-anchor="middle">patinate fetch-osm</text>
+    <text class="freq" x="360" y="183" text-anchor="middle">once · per city</text>
+    <text class="desc" x="360" y="204" text-anchor="middle">basemap fixture</text>
+  </g>
+  <g class="stage">
+    <rect x="500" y="140" width="160" height="80" rx="3"/>
+    <text class="cmd" x="580" y="166" text-anchor="middle">patinate sync</text>
+    <text class="freq" x="580" y="183" text-anchor="middle">incremental · ongoing</text>
+    <text class="desc" x="580" y="204" text-anchor="middle">pull new activities</text>
+  </g>
+  <g class="stage">
+    <rect x="720" y="140" width="160" height="80" rx="3"/>
+    <text class="cmd" x="800" y="166" text-anchor="middle">patinate render</text>
+    <text class="freq" x="800" y="183" text-anchor="middle">on demand</text>
+    <text class="desc" x="800" y="204" text-anchor="middle">compose the poster</text>
+  </g>
+
+  <!-- Local state (bottom row) -->
+  <g class="src">
+    <rect x="60" y="290" width="160" height="50" rx="3"/>
+    <text x="140" y="312" text-anchor="middle">CONFIG.TOML</text>
+    <text x="140" y="326" text-anchor="middle">REFRESH-TOKEN</text>
+  </g>
+  <g class="src">
+    <rect x="280" y="290" width="160" height="50" rx="3"/>
+    <text x="360" y="312" text-anchor="middle">OSM CACHE</text>
+    <text x="360" y="326" text-anchor="middle">.JSON.GZ</text>
+  </g>
+  <g class="src">
+    <rect x="500" y="290" width="160" height="50" rx="3"/>
+    <text x="580" y="312" text-anchor="middle">ACTIVITY CACHE</text>
+    <text x="580" y="326" text-anchor="middle">SQLITE · LOCAL</text>
+  </g>
+  <g class="src">
+    <rect x="720" y="290" width="160" height="50" rx="3"/>
+    <text x="800" y="312" text-anchor="middle">POSTER</text>
+    <text x="800" y="326" text-anchor="middle">SVG · PNG</text>
+  </g>
+
+  <!-- Vertical arrows: external → stage -->
+  <line class="arr-data" x1="140" y1="72" x2="140" y2="136"/>
+  <polygon class="arr-data-head" points="140,138 137,131 143,131"/>
+  <line class="arr-data" x1="360" y1="72" x2="360" y2="136"/>
+  <polygon class="arr-data-head" points="360,138 357,131 363,131"/>
+  <line class="arr-data" x1="580" y1="72" x2="580" y2="136"/>
+  <polygon class="arr-data-head" points="580,138 577,131 583,131"/>
+
+  <!-- Vertical arrows: stage → local state -->
+  <line class="arr-data" x1="140" y1="222" x2="140" y2="288"/>
+  <polygon class="arr-data-head" points="140,290 137,283 143,283"/>
+  <line class="arr-data" x1="360" y1="222" x2="360" y2="288"/>
+  <polygon class="arr-data-head" points="360,290 357,283 363,283"/>
+  <line class="arr-data" x1="580" y1="222" x2="580" y2="288"/>
+  <polygon class="arr-data-head" points="580,290 577,283 583,283"/>
+  <line class="arr-data" x1="800" y1="222" x2="800" y2="288"/>
+  <polygon class="arr-data-head" points="800,290 797,283 803,283"/>
+
+  <!-- Horizontal sequence arrows: stage → next stage -->
+  <line class="arr" x1="220" y1="180" x2="278" y2="180"/>
+  <polygon class="arr-head" points="278,180 270,176 270,184"/>
+  <line class="arr" x1="440" y1="180" x2="498" y2="180"/>
+  <polygon class="arr-head" points="498,180 490,176 490,184"/>
+  <line class="arr" x1="660" y1="180" x2="718" y2="180"/>
+  <polygon class="arr-head" points="718,180 710,176 710,184"/>
+
+  <!-- "render reads from" cross-flow: data flow from local state to render -->
+  <path class="arr-data" d="M 140 340 L 140 354 L 800 354 L 800 344"/>
+  <polygon class="arr-data-head" points="800,344 797,351 803,351"/>
+  <text class="label" x="470" y="350" text-anchor="middle">render reads all three caches</text>
+</svg>

@@ -21,6 +21,47 @@
   letter-spacing: -0.02em;
 }
 
+/* pipeline-figure: ships a wide horizontal SVG for desktop and a
+   stacked vertical SVG for mobile. The wide one would horizontal-
+   scroll on narrow viewports with text too small to read; the
+   stacked variant carries the same information arranged for portrait
+   reading. Swap by viewport width, not by min-width-clamping the
+   single SVG. */
+.pipeline-figure .pipeline-wide { display: block; min-width: 0; }
+.pipeline-figure .pipeline-narrow { display: none; }
+@media (max-width: 720px) {
+  .pipeline-figure { overflow: visible; }
+  .pipeline-figure .pipeline-wide { display: none; }
+  .pipeline-figure .pipeline-narrow {
+    display: block;
+    width: 100%;
+    height: auto;
+    min-width: 0;
+  }
+}
+
+/* theme-tile: the four-theme gallery overrides the default .tile
+   padding so the rendered PNG bleeds to the tile edges. Caption
+   sits inset, separated from the image by a thin rule. */
+.tile.theme-tile {
+  padding: 0;
+  overflow: hidden;
+}
+.tile.theme-tile img {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-bottom: 1px solid var(--border);
+}
+.tile.theme-tile figcaption {
+  padding: var(--space-3) var(--space-4) var(--space-4);
+}
+.tile.theme-tile .tile-eyebrow,
+.tile.theme-tile .tile-headline,
+.tile.theme-tile .tile-prose { margin: 0; }
+.tile.theme-tile .tile-headline { margin: var(--space-1) 0; }
+.tile.theme-tile .tile-prose { margin-top: var(--space-1); }
+
 /* The heatmap embed sits in a dark print-plate frame against the
    paper canvas — preserves the editorial print-edition feel of the
    earlier site within the canonical .diagram pattern. */
@@ -36,17 +77,6 @@
   overflow: hidden;
   position: relative;
 }
-.diagram.print-frame .print-num {
-  position: absolute;
-  top: var(--space-2);
-  left: var(--space-4);
-  font-family: var(--font-mono);
-  font-size: var(--text-xs);
-  letter-spacing: 0.25em;
-  text-transform: uppercase;
-  color: rgba(244, 238, 220, 0.55);
-}
-.diagram.print-frame .print-num span { color: var(--accent); }
 .diagram.print-frame .heatmap-host {
   background: #faf6ed;
   margin-top: var(--space-3);
