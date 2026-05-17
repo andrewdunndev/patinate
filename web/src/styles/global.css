@@ -267,7 +267,11 @@ main.page {
   right: 0;
   width: 180px;
   height: auto;
-  opacity: 0.95;
+  /* Recedes so the hero title alone holds the moss accent focus.
+     Per reference's /design/diagrams/ "the accent is a budget":
+     decorative glyphs in the hero band don't compete with the
+     title for attention. */
+  opacity: 0.45;
 }
 .hero-title {
   font-size: clamp(3.5rem, 8vw, 6rem);

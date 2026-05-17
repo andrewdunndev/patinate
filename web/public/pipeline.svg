@@ -58,24 +58,24 @@
 
   <!-- Local state (bottom row) -->
   <g class="src">
-    <rect x="60" y="290" width="160" height="50" rx="3"/>
-    <text x="140" y="312" text-anchor="middle">CONFIG.TOML</text>
-    <text x="140" y="326" text-anchor="middle">REFRESH-TOKEN</text>
+    <rect x="60" y="288" width="160" height="50" rx="3"/>
+    <text x="140" y="308" text-anchor="middle">CONFIG.TOML</text>
+    <text x="140" y="324" text-anchor="middle">REFRESH-TOKEN</text>
   </g>
   <g class="src">
-    <rect x="280" y="290" width="160" height="50" rx="3"/>
-    <text x="360" y="312" text-anchor="middle">OSM CACHE</text>
-    <text x="360" y="326" text-anchor="middle">.JSON.GZ</text>
+    <rect x="280" y="288" width="160" height="50" rx="3"/>
+    <text x="360" y="308" text-anchor="middle">OSM CACHE</text>
+    <text x="360" y="324" text-anchor="middle">.JSON.GZ</text>
   </g>
   <g class="src">
-    <rect x="500" y="290" width="160" height="50" rx="3"/>
-    <text x="580" y="312" text-anchor="middle">ACTIVITY CACHE</text>
-    <text x="580" y="326" text-anchor="middle">SQLITE · LOCAL</text>
+    <rect x="500" y="288" width="160" height="50" rx="3"/>
+    <text x="580" y="308" text-anchor="middle">ACTIVITY CACHE</text>
+    <text x="580" y="324" text-anchor="middle">SQLITE · LOCAL</text>
   </g>
   <g class="src">
-    <rect x="720" y="290" width="160" height="50" rx="3"/>
-    <text x="800" y="312" text-anchor="middle">POSTER</text>
-    <text x="800" y="326" text-anchor="middle">SVG · PNG</text>
+    <rect x="720" y="288" width="160" height="50" rx="3"/>
+    <text x="800" y="308" text-anchor="middle">POSTER</text>
+    <text x="800" y="324" text-anchor="middle">SVG · PNG</text>
   </g>
 
   <!-- Vertical arrows: external → stage -->
@@ -87,14 +87,14 @@
   <polygon class="arr-data-head" points="580,138 577,131 583,131"/>
 
   <!-- Vertical arrows: stage → local state -->
-  <line class="arr-data" x1="140" y1="222" x2="140" y2="288"/>
-  <polygon class="arr-data-head" points="140,290 137,283 143,283"/>
-  <line class="arr-data" x1="360" y1="222" x2="360" y2="288"/>
-  <polygon class="arr-data-head" points="360,290 357,283 363,283"/>
-  <line class="arr-data" x1="580" y1="222" x2="580" y2="288"/>
-  <polygon class="arr-data-head" points="580,290 577,283 583,283"/>
-  <line class="arr-data" x1="800" y1="222" x2="800" y2="288"/>
-  <polygon class="arr-data-head" points="800,290 797,283 803,283"/>
+  <line class="arr-data" x1="140" y1="220" x2="140" y2="284"/>
+  <polygon class="arr-data-head" points="140,288 136,280 144,280"/>
+  <line class="arr-data" x1="360" y1="220" x2="360" y2="284"/>
+  <polygon class="arr-data-head" points="360,288 356,280 364,280"/>
+  <line class="arr-data" x1="580" y1="220" x2="580" y2="284"/>
+  <polygon class="arr-data-head" points="580,288 576,280 584,280"/>
+  <line class="arr-data" x1="800" y1="220" x2="800" y2="284"/>
+  <polygon class="arr-data-head" points="800,288 796,280 804,280"/>
 
   <!-- Horizontal sequence arrows: stage → next stage -->
   <line class="arr" x1="220" y1="180" x2="278" y2="180"/>
@@ -104,8 +104,7 @@
   <line class="arr" x1="660" y1="180" x2="718" y2="180"/>
   <polygon class="arr-head" points="718,180 710,176 710,184"/>
 
-  <!-- "render reads from" cross-flow: data flow from local state to render -->
-  <path class="arr-data" d="M 140 340 L 140 354 L 800 354 L 800 344"/>
-  <polygon class="arr-data-head" points="800,344 797,351 803,351"/>
-  <text class="label" x="470" y="350" text-anchor="middle">render reads all three caches</text>
+  <!-- "render reads from" is named in the prose under the figure;
+       no need to draw the cross-flow back to render. The vertical
+       arrows above already establish each stage's local-state pair. -->
 </svg>
