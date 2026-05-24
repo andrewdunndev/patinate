@@ -31,22 +31,22 @@ clap = { version = "4", features = ["derive", "env"] }
 # config + serde
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-toml = "0.8"
+toml = "0.9"
 figment = { version = "0.10", features = ["toml", "env"] }
 
 # strava
-reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
+reqwest = { version = "0.13", default-features = false, features = ["json", "rustls-tls"] }
 oauth2 = "5"
 tokio = { version = "1", features = ["rt", "macros", "fs", "sync"] }
 url = "2"
 
 # polyline + geo
 polyline = "0.11"
-geo = "0.29"
+geo = "0.33"
 geo-types = "0.7"
 
 # storage
-rusqlite = { version = "0.32", features = ["bundled"] }
+rusqlite = { version = "0.39", features = ["bundled"] }
 
 # render
 svg = "0.18"
