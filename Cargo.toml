@@ -46,7 +46,7 @@ geo = "0.33"
 geo-types = "0.7"
 
 # storage
-rusqlite = { version = "0.39", features = ["bundled"] }
+rusqlite = { version = "0.40", features = ["bundled"] }
 
 # render
 svg = "0.18"
