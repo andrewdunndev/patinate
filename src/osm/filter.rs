@@ -139,7 +139,7 @@ pub fn keep_largest_components(basemap: &mut Basemap, n: usize) {
         *sizes.entry(uf.find(i)).or_insert(0) += 1;
     }
     let mut ranked: Vec<(usize, usize)> = sizes.into_iter().collect();
-    ranked.sort_by(|a, b| b.1.cmp(&a.1));
+    ranked.sort_by_key(|&(_, size)| std::cmp::Reverse(size));
     let kept_roots: std::collections::HashSet<usize> =
         ranked.into_iter().take(n).map(|(root, _)| root).collect();
 
@@ -186,7 +186,7 @@ pub fn simplify(basemap: &mut Basemap, epsilon_deg: f64) {
             .iter()
             .map(|p| Coord { x: p.lon, y: p.lat })
             .collect();
-        let simplified = ls.simplify(&epsilon_deg);
+        let simplified = ls.simplify(epsilon_deg);
         road.geometry = simplified
             .into_inner()
             .into_iter()
