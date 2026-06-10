@@ -66,6 +66,12 @@ html { color-scheme: light; }
    but here it leaves prose a narrow ribbon against full-width boxes. */
 .section-prose { max-width: none; }
 
+/* brand: contiguous wordmark. Canonical .brand is a flex row with
+   gap:var(--space-2) for a brand-mark icon beside the name; patinate
+   has no mark, so the gap wrongly opens a space between "patinate" and
+   ".dunn.dev". Close it so the domain reads as one unit. */
+.brand { gap: 0; }
+
 /* pipeline-figure: ships a wide horizontal SVG for desktop and a
    stacked vertical SVG for mobile. The wide one would horizontal-
    scroll on narrow viewports with text too small to read; the
