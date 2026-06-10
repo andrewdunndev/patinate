@@ -58,6 +58,14 @@ html { color-scheme: light; }
   line-height: 1;
 }
 
+/* prose fills the content column. patinate is a data-sheet, not a
+   blog: body prose should match the width of the pipeline figure,
+   print frame, and tile grids beneath it, so the page column is the
+   single content measure. Canonical site.css caps .section-prose at
+   64ch — a reading measure right for docs sites like reference.dunn.dev,
+   but here it leaves prose a narrow ribbon against full-width boxes. */
+.section-prose { max-width: none; }
+
 /* pipeline-figure: ships a wide horizontal SVG for desktop and a
    stacked vertical SVG for mobile. The wide one would horizontal-
    scroll on narrow viewports with text too small to read; the
