@@ -35,7 +35,7 @@ toml = "1.0"
 figment = { version = "0.10", features = ["toml", "env"] }
 
 # strava
-reqwest = { version = "0.13", default-features = false, features = ["json", "rustls-tls"] }
+reqwest = { version = "0.13", default-features = false, features = ["json", "query", "form", "rustls"] }
 oauth2 = "5"
 tokio = { version = "1", features = ["rt", "macros", "fs", "sync"] }
 url = "2"
