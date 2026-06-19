@@ -23,6 +23,8 @@ stages:
   - package
   - release
   - deploy
+  - verdict
+  - gate
 
 variables:
   CARGO_HOME: ${CI_PROJECT_DIR}/.cargo
@@ -30,6 +32,19 @@ variables:
 include:
   # GitLab Ultimate security scanner (preserved from bespoke CI).
   - template: Jobs/Secret-Detection.gitlab-ci.yml
+
+  # Fail-closed automerge gate (adversarial-review finding N1).
+  # Renovate automerges minor + patch on this repo; on GitLab the
+  # automerge decision rides the aggregate pipeline status, so the
+  # whole pipeline (lint + test + build above, plus the OSV verdict
+  # below) must pass before Renovate native auto-merge proceeds.
+  # osv-verdict emits CHECK_OSV via dotenv (newly-introduced findings
+  # only on MRs); automerge-gate consumes it over needs: and blocks
+  # unless every required check is present and pass.
+  - component: gitlab.com/dunn.dev/pipeline/osv-verdict@2.7.0
+  - component: gitlab.com/dunn.dev/pipeline/automerge-gate@2.7.0
+    inputs:
+      required-checks: "osv"
 
   # Lint: cargo fmt + clippy via the catalog's pinned ci-rust.
   - component: gitlab.com/dunn.dev/pipeline/rust-lint@2.6.0
