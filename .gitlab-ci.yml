@@ -56,9 +56,17 @@ include:
   - component: gitlab.com/dunn.dev/pipeline/rust-audit@3.0.0
 
   # Branch verification: cargo build + test on every push.
+  #
+  # job_name override: cloudflare-worker@3.0.0's "build" job (Astro
+  # site, below) collided with this component's default job name
+  # ("build" too). GitLab component includes merge on job-name key,
+  # so cloudflare-worker's "build" silently clobbered this one —
+  # cargo build/test hadn't run since ~2026-05-09. Distinct name
+  # restores both jobs.
   - component: gitlab.com/dunn.dev/pipeline/rust-build@3.0.0
     inputs:
       package_path: .
+      job_name: cargo-build
 
   # Tag-only: parallel:matrix cross-compile (linux/amd64+arm64,
   # darwin/arm64) via cargo-zigbuild + per-binary cosign signature
