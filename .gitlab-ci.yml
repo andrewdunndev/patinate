@@ -63,19 +63,19 @@ include:
   # osv-verdict emits CHECK_OSV via dotenv (newly-introduced findings
   # only on MRs); automerge-gate consumes it over needs: and blocks
   # unless every required check is present and pass.
-  - component: gitlab.com/dunn.dev/pipeline/osv-verdict@3.0.0
-  - component: gitlab.com/dunn.dev/pipeline/automerge-gate@3.0.0
+  - component: gitlab.com/dunn.dev/pipeline/osv-verdict@3.1.0
+  - component: gitlab.com/dunn.dev/pipeline/automerge-gate@3.1.0
     inputs:
       required-checks: "osv"
 
   # Lint: cargo fmt + clippy via the catalog's pinned ci-rust.
-  - component: gitlab.com/dunn.dev/pipeline/rust-lint@3.0.0
+  - component: gitlab.com/dunn.dev/pipeline/rust-lint@3.1.0
 
   # Audit: cargo audit. Catalog default is allow_failure: true;
   # patinate previously overrode to false (audit_allow_failure:
   # false in the nomograph super-component) — preserved as a
   # job-level override below.
-  - component: gitlab.com/dunn.dev/pipeline/rust-audit@3.0.0
+  - component: gitlab.com/dunn.dev/pipeline/rust-audit@3.1.0
 
   # Branch verification: cargo build + test on every push.
   #
@@ -85,7 +85,7 @@ include:
   # so cloudflare-worker's "build" silently clobbered this one —
   # cargo build/test hadn't run since ~2026-05-09. Distinct name
   # restores both jobs.
-  - component: gitlab.com/dunn.dev/pipeline/rust-build@3.0.0
+  - component: gitlab.com/dunn.dev/pipeline/rust-build@3.1.0
     inputs:
       package_path: .
       job_name: cargo-build
@@ -93,29 +93,29 @@ include:
   # Tag-only: parallel:matrix cross-compile (linux/amd64+arm64,
   # darwin/arm64) via cargo-zigbuild + per-binary cosign signature
   # + per-binary .sha256 + upload to package registry.
-  - component: gitlab.com/dunn.dev/pipeline/rust-release-binary@3.0.0
+  - component: gitlab.com/dunn.dev/pipeline/rust-release-binary@3.1.0
     inputs:
       binary_name: patinate
       package_name: patinate
 
   # Tag-only: CycloneDX SBOM per binary via syft.
-  - component: gitlab.com/dunn.dev/pipeline/rust-sbom@3.0.0
+  - component: gitlab.com/dunn.dev/pipeline/rust-sbom@3.1.0
     inputs:
       package_name: patinate
 
   # Tag-only: SLSA v1.0 provenance per binary, cosign-signed via
   # GitLab OIDC keyless. Language-agnostic; same template Go uses.
-  - component: gitlab.com/dunn.dev/pipeline/slsa-attest@3.0.0
+  - component: gitlab.com/dunn.dev/pipeline/slsa-attest@3.1.0
 
   # Tag-only: GitLab Release with binaries + SBOMs + attestations
   # linked. Idempotent across pipeline reruns.
-  - component: gitlab.com/dunn.dev/pipeline/release-create@3.0.0
+  - component: gitlab.com/dunn.dev/pipeline/release-create@3.1.0
     inputs:
       package_name: patinate
 
   # Tag-only: idempotent crates.io publish. Requires
   # CARGO_REGISTRY_TOKEN as a masked, protected CI variable.
-  - component: gitlab.com/dunn.dev/pipeline/rust-crates-publish@3.0.0
+  - component: gitlab.com/dunn.dev/pipeline/rust-crates-publish@3.1.0
     inputs:
       crate_name: patinate
 
@@ -133,7 +133,7 @@ include:
   # Privacy: the bundled fixture is public Strava segment
   # polylines (athlete IDs zeroed, gear IDs placeholders, names
   # generic). No real-rider identifiers ship.
-  - component: gitlab.com/dunn.dev/pipeline/cloudflare-worker@3.0.0
+  - component: gitlab.com/dunn.dev/pipeline/cloudflare-worker@3.1.0
     inputs:
       wrangler_config: web/wrangler.toml
       build_command: npm run build
