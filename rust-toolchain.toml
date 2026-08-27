@@ -1,5 +1,5 @@
 [toolchain]
-channel = "1.97.1"
+channel = "1.98.0"
 components = ["rustfmt", "clippy"]
 # Targets must be listed here so rustup provisions them when this
 # toolchain.toml triggers a fresh toolchain install (e.g. inside the
