@@ -1,11 +1,12 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1080 360" role="img" aria-label="patinate runs as four CLI commands in sequence. auth performs a one-time OAuth handshake with Strava that writes a refresh token into the local config. fetch-osm pulls the city basemap from the Overpass API once per city. sync pulls new activities from Strava into a local cache, incrementally on every run. render combines the config, OSM basemap, and cached activities into an SVG or PNG poster on disk.">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="40 0 860 358" role="img" aria-label="patinate runs as four CLI commands in sequence. auth performs a one-time OAuth handshake with Strava that writes a refresh token into the local config. fetch-osm pulls the city basemap from the Overpass API once per city. sync pulls new activities from Strava into a local cache, incrementally on every run. render combines the config, OSM basemap, and cached activities into an SVG or PNG poster on disk.">
   <style>
     .stage rect { fill: #ffffff; stroke: #4a6741; stroke-width: 1.5; }
     .stage .cmd { font: 700 13px 'IBM Plex Mono', Menlo, monospace; fill: #4a6741; }
     .stage .freq { font: 600 9px 'IBM Plex Mono', Menlo, monospace; fill: #707070; letter-spacing: 0.08em; text-transform: uppercase; }
     .stage .desc { font: 400 11px 'IBM Plex Sans', system-ui, sans-serif; fill: #404040; }
     .src rect { fill: #f4f4f4; stroke: #c4c4c4; stroke-width: 1; stroke-dasharray: 3 2; }
-    .src text { font: 600 9px 'IBM Plex Mono', Menlo, monospace; fill: #707070; letter-spacing: 0.06em; text-transform: uppercase; }
+    .src .name { font: 600 11px 'IBM Plex Sans', system-ui, sans-serif; fill: #404040; }
+    .src .sub { font: 400 9px 'IBM Plex Mono', Menlo, monospace; fill: #707070; letter-spacing: 0.06em; }
     .arr { stroke: #4a6741; stroke-width: 1.5; fill: none; }
     .arr-head { fill: #4a6741; }
     .arr-data { stroke: #707070; stroke-width: 1; fill: none; stroke-dasharray: 3 2; }
@@ -16,18 +17,18 @@
   <!-- External sources/sinks (top row) -->
   <g class="src">
     <rect x="60" y="20" width="160" height="50" rx="3"/>
-    <text x="140" y="42" text-anchor="middle">STRAVA</text>
-    <text x="140" y="56" text-anchor="middle">OAUTH ENDPOINT</text>
+    <text class="name" x="140" y="43" text-anchor="middle">Strava</text>
+    <text class="sub" x="140" y="57" text-anchor="middle">oauth endpoint</text>
   </g>
   <g class="src">
     <rect x="280" y="20" width="160" height="50" rx="3"/>
-    <text x="360" y="42" text-anchor="middle">OVERPASS API</text>
-    <text x="360" y="56" text-anchor="middle">OPENSTREETMAP</text>
+    <text class="name" x="360" y="43" text-anchor="middle">Overpass API</text>
+    <text class="sub" x="360" y="57" text-anchor="middle">openstreetmap</text>
   </g>
   <g class="src">
     <rect x="500" y="20" width="160" height="50" rx="3"/>
-    <text x="580" y="42" text-anchor="middle">STRAVA</text>
-    <text x="580" y="56" text-anchor="middle">ACTIVITIES API</text>
+    <text class="name" x="580" y="43" text-anchor="middle">Strava</text>
+    <text class="sub" x="580" y="57" text-anchor="middle">activities api</text>
   </g>
 
   <!-- Four CLI stages (middle row) -->
@@ -59,23 +60,23 @@
   <!-- Local state (bottom row) -->
   <g class="src">
     <rect x="60" y="288" width="160" height="50" rx="3"/>
-    <text x="140" y="308" text-anchor="middle">CONFIG.TOML</text>
-    <text x="140" y="324" text-anchor="middle">REFRESH-TOKEN</text>
+    <text class="name" x="140" y="311" text-anchor="middle">config.toml</text>
+    <text class="sub" x="140" y="325" text-anchor="middle">refresh token</text>
   </g>
   <g class="src">
     <rect x="280" y="288" width="160" height="50" rx="3"/>
-    <text x="360" y="308" text-anchor="middle">OSM CACHE</text>
-    <text x="360" y="324" text-anchor="middle">.JSON.GZ</text>
+    <text class="name" x="360" y="311" text-anchor="middle">OSM cache</text>
+    <text class="sub" x="360" y="325" text-anchor="middle">.json.gz</text>
   </g>
   <g class="src">
     <rect x="500" y="288" width="160" height="50" rx="3"/>
-    <text x="580" y="308" text-anchor="middle">ACTIVITY CACHE</text>
-    <text x="580" y="324" text-anchor="middle">SQLITE · LOCAL</text>
+    <text class="name" x="580" y="311" text-anchor="middle">Activity cache</text>
+    <text class="sub" x="580" y="325" text-anchor="middle">sqlite · local</text>
   </g>
   <g class="src">
     <rect x="720" y="288" width="160" height="50" rx="3"/>
-    <text x="800" y="308" text-anchor="middle">POSTER</text>
-    <text x="800" y="324" text-anchor="middle">SVG · PNG</text>
+    <text class="name" x="800" y="311" text-anchor="middle">Poster</text>
+    <text class="sub" x="800" y="325" text-anchor="middle">svg · png</text>
   </g>
 
   <!-- Vertical arrows: external → stage -->
