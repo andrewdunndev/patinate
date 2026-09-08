@@ -71,6 +71,13 @@ include:
   # Lint: cargo fmt + clippy via the catalog's pinned ci-rust.
   - component: gitlab.com/dunn.dev/pipeline/rust-lint@4.6.0
 
+  # dunn.dev/reference conformance check, advisory: reports contract
+  # violations without failing the pipeline until the repo is clean.
+  - component: gitlab.com/dunn.dev/pipeline/reference-check@4.6.0
+    inputs:
+      reference_ref: main
+      fail_on_violation: false
+
   # Audit: cargo audit. Catalog default is allow_failure: true;
   # patinate previously overrode to false (audit_allow_failure:
   # false in the nomograph super-component) — preserved as a
