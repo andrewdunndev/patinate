@@ -159,7 +159,7 @@ magick /tmp/hero.png -quality 82 hero.webp
 For inline SVG (hover behavior, JS filters, vector zoom), skip the
 rasterize. Heat paths emit `data-rider` / `data-bike` / `data-year` /
 `data-type` for consumer JS to wire up. **If the embedding page is
-public, `--anonymize` first** — see "Privacy" above.
+public, `--anonymize` first.** See "Privacy" above.
 
 </details>
 
