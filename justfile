@@ -5,7 +5,13 @@ config := "fixtures/config.toml"
 osm := "fixtures/grand-rapids.osm.json.gz"
 activities := "fixtures/activities.json"
 scratch := "target/render"
-render := patinate + " render --config " + config + " --osm " + osm + " --activities " + activities
+# The committed assets render from fixtures/config.toml alone. config::load
+# merges $XDG_CONFIG_HOME/patinate/config.toml and PATINATE_*__* over it,
+# which would carry a real home and salt into public files, so each render
+# reads an empty config dir and _fixture-env refuses the env overrides.
+# Scoped to patinate: a global export would hide mise's own config.
+no_user_config := justfile_directory() / "target/no-user-config"
+render := "XDG_CONFIG_HOME=" + quote(no_user_config) + " " + patinate + " render --config " + config + " --osm " + osm + " --activities " + activities
 
 _default:
     @just --list
@@ -17,8 +23,17 @@ all: example themes site
 release:
     cargo build --release
 
+# fail when a PATINATE_*__* config override is exported
+_fixture-env:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    if names=$(compgen -e | grep -E '^PATINATE_[A-Z0-9_]*__'); then
+        echo "unset before rendering fixtures:" $names >&2
+        exit 1
+    fi
+
 # reproduce the README hero image (3-up gallery)
-example: release
+example: _fixture-env release
     #!/usr/bin/env bash
     set -euo pipefail
     mkdir -p assets {{scratch}}
@@ -38,7 +53,7 @@ example: release
     echo "Wrote assets/example-noir.png and assets/example-gallery.png"
 
 # render the four theme previews into assets/themes
-themes: release
+themes: _fixture-env release
     #!/usr/bin/env bash
     set -euo pipefail
     mkdir -p assets/themes {{scratch}}
@@ -51,13 +66,13 @@ themes: release
     echo "Wrote assets/themes/*.png"
 
 # build public/ for a local preview of the README embed recipe
-site: release
+site: _fixture-env release
     mkdir -p public
     {{render}} --theme cycle_heat --web --transparent-bg --out public/heatmap-web.svg
     cp examples/site/index.html public/index.html
 
 # refresh the committed heatmap and images that web/ serves
-web: example themes
+web: _fixture-env example themes
     #!/usr/bin/env bash
     set -euo pipefail
     {{render}} --theme cycle_heat --web --transparent-bg --out web/public/heatmap-web.svg
