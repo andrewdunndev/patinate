@@ -19,11 +19,6 @@ Cargo.lock.bak
 # build outputs from `make site` (GitLab Pages CI generates this fresh)
 /public
 
-# OSM basemap is large (~36MB) and cached in CI; regenerable via
-# `patinate fetch-osm` for any city. Local devs cache it; not
-# tracked in git.
-/fixtures/*.osm.json.gz
-
 # patinate.dunn.dev site build artifacts (web/ is an Astro project).
 # Keep the rendered heatmap fixture tracked so the deploy doesn't
 # require a Rust build in CI — Makefile target `make heatmap`
