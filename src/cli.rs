@@ -97,11 +97,11 @@ struct FetchOsmArgs {
     city: Option<String>,
 
     /// Center latitude in decimal degrees. Pair with --center-lng.
-    #[arg(long)]
+    #[arg(long, allow_negative_numbers = true)]
     center_lat: Option<f64>,
 
     /// Center longitude in decimal degrees. Pair with --center-lat.
-    #[arg(long)]
+    #[arg(long, allow_negative_numbers = true)]
     center_lng: Option<f64>,
 
     /// Search radius in meters around the center point. 25000 is a
@@ -1053,6 +1053,26 @@ mod tests {
             .command
         {
             Command::Render(args) => args,
+            _ => unreachable!(),
+        }
+    }
+
+    #[test]
+    fn fetch_osm_accepts_negative_coordinates() {
+        let cli = Cli::try_parse_from([
+            "patinate",
+            "fetch-osm",
+            "--center-lat",
+            "-33.87",
+            "--center-lng",
+            "-85.66",
+        ])
+        .expect("negative coords parse");
+        match cli.command {
+            Command::FetchOsm(a) => {
+                assert_eq!(a.center_lat, Some(-33.87));
+                assert_eq!(a.center_lng, Some(-85.66));
+            }
             _ => unreachable!(),
         }
     }
