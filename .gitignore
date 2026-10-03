@@ -16,12 +16,12 @@ Cargo.lock.bak
 !/avatar.png
 !/brand.png
 
-# build outputs from `make site` (GitLab Pages CI generates this fresh)
+# local preview from `just site`
 /public
 
 # patinate.dunn.dev site build artifacts (web/ is an Astro project).
 # Keep the rendered heatmap fixture tracked so the deploy doesn't
-# require a Rust build in CI — Makefile target `make heatmap`
+# require a Rust build in CI — `just web`
 # regenerates it from fixtures/ when patinate evolves.
 /web/node_modules/
 /web/dist/

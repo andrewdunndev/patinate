@@ -131,13 +131,12 @@ include:
   #
   # The live heatmap embed (web/public/heatmap-web.svg) is
   # committed to the repo (rendered locally from
-  # fixtures/activities.json + cached OSM basemap), so the deploy
-  # pipeline doesn't need a Rust build. Regenerate the heatmap
+  # the fixtures by `just web`), so the deploy
+  # pipeline doesn't need a Rust build. Rerun `just web`
   # when fixtures or theme renderer change.
   #
-  # Privacy: the bundled fixture is public Strava segment
-  # polylines (athlete IDs zeroed, gear IDs placeholders, names
-  # generic). No real-rider identifiers ship.
+  # Privacy: the bundled activities are fully synthetic
+  # (examples/synth_activities.rs). No real-rider data ships.
   - component: gitlab.com/dunn.dev/pipeline/cloudflare-worker@4
     inputs:
       wrangler_config: web/wrangler.toml
