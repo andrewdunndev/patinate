@@ -393,20 +393,6 @@ fn build_line_group(
     g
 }
 
-/// Average channel of a `#rrggbb` color as a perceptual proxy. Themes
-/// with a dark background get the major-road halo (helps light-on-dark
-/// freeways stand out from the residential mesh); light-bg themes skip
-/// it (the halo reads as a shadow on cream paper without adding signal).
-fn bg_is_dark(bg_hex: &str) -> bool {
-    let s = bg_hex.trim_start_matches('#');
-    if s.len() != 6 {
-        return true;
-    }
-    let parse = |i| u32::from_str_radix(&s[i..i + 2], 16).unwrap_or(128);
-    let avg = (parse(0) + parse(2) + parse(4)) / 3;
-    avg < 128
-}
-
 /// Build the road group: one sub-group per tier, residential first.
 /// `web` skips the two minor tiers (tertiary + residential) so all
 /// `--web` semantics live in one place.
@@ -444,8 +430,7 @@ fn build_roads(basemap: &Basemap, theme: &Theme, proj: &Projection, web: bool) -
             // no halo because the dark sepia road color is high-contrast
             // enough on cream that an extra glow reads as a shadow rather
             // than a presence-amplifier.
-            if matches!(tier, RoadTier::Motorway | RoadTier::Trunk) && bg_is_dark(theme.bg.as_str())
-            {
+            if matches!(tier, RoadTier::Motorway | RoadTier::Trunk) && !theme.bg.is_light() {
                 roads = roads.add(build_road_layer(
                     geoms,
                     style.color.as_str(),
@@ -583,14 +568,13 @@ fn build_heat(
 
     let mut stack = Group::new().set("class", "heat-stack");
     for &(class, width, alpha) in layers {
-        // Outer halo layers use NORMAL blend (additive wash, no
-        // darkening). Sharp core uses multiply (saturates where many
-        // rides overlap). Mixed-mode keeps cream paper warm under the
-        // glow, only the rideline cores press into deep saturation.
+        // Halos use NORMAL blend (a wash, no darkening). The sharp core
+        // takes the theme's blend: multiply presses rides into cream
+        // paper, screen lifts them off a dark ground.
         let blend = if class == "heat" {
-            "mix-blend-mode: multiply"
+            format!("mix-blend-mode: {}", theme.heat_blend().as_css())
         } else {
-            "mix-blend-mode: normal"
+            "mix-blend-mode: normal".to_string()
         };
         let mut g = Group::new()
             .set("class", class)
