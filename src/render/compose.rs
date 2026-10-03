@@ -10,14 +10,14 @@ use std::fmt::Write as _;
 use anyhow::Result;
 use svg::Document;
 use svg::node::element::{
-    Definitions, Description, Group, LinearGradient, Path, Rectangle, Stop, Title,
+    Definitions, Description, Group, LinearGradient, Path, Rectangle, Stop, Title, Use,
 };
 
 use crate::config::ValidatedConfig;
 use crate::obfuscation::ObfuscatedActivity;
 use crate::osm::{Basemap, LatLon};
 use crate::render::projection::Projection;
-use crate::render::theme::{RoadTier, Theme};
+use crate::render::theme::{HeatBlend, RoadTier, Theme};
 use crate::render::typography;
 
 /// Per-render overrides on top of the theme's baked values.
@@ -53,9 +53,8 @@ impl Default for HeatTuning {
 
 /// Top-level entry. Returns the SVG document as a string.
 /// - `heat_only`: skip basemap (water, parks, roads).
-/// - `web`: web-embed preset — single-layer heat (no glow stack),
-///   coord precision 1, no own typography. Targets ~500KB for inline
-///   use on a consumer page.
+/// - `web`: web-embed preset — a lighter glow, coord precision 1, no
+///   own typography. Targets a small inline SVG for a consumer page.
 /// - `transparent_bg`: skip the bg rect so the SVG paints over the
 ///   consumer page's own background. Combine with `web` for inline.
 /// - `tuning`: runtime knobs that scale the theme's bloom and core
@@ -118,9 +117,9 @@ pub fn render(
     // inline SVG inside its file-size budget.
     let roads = build_roads(basemap, theme, &proj, web);
 
-    // Heat: three-layer glow for posters, single-layer for web embed.
-    // Web variant also drops one digit of float precision in `d`
-    // strings — about a 25% file-size reduction on a dense city.
+    // Heat: one path group drawn by a three-layer <use> glow stack.
+    // Web variant lightens the glow and drops one digit of float
+    // precision in `d` strings.
     let heat = build_heat(activities, theme, &proj, web, tuning);
 
     // Fades (top + bottom rects pointing at the gradients).
@@ -465,10 +464,8 @@ fn tier_class(tier: RoadTier) -> &'static str {
     }
 }
 
-/// Build the heat group. Two render modes:
-///
-/// **Poster (web=false):** three concentric stroke layers per ride for
-/// the painterly glow stack:
+/// Build the heat group: the ride paths once under `#heat-paths`, then
+/// three `<use>` layers of it for the painterly glow stack:
 ///   outer halo (`heat.glow_outer_ratio` x width, `heat.glow_outer_alpha`)
 ///   inner halo (`heat.glow_inner_ratio` x width, `heat.glow_inner_alpha`)
 ///   sharp core (1.0 x width, `heat.alpha`)
@@ -476,8 +473,8 @@ fn tier_class(tier: RoadTier) -> &'static str {
 /// warm_beige) lift the halo opacity in their JSON so the bloom registers
 /// against a warm background.
 ///
-/// **Web (web=true):** single sharp-core layer only, coord precision
-/// dropped from 2 to 1 digit. Targets a small inline-on-page SVG.
+/// **Web (web=true):** halo opacity halved, coord precision dropped
+/// from 2 to 1 digit. `bloom = 0` keeps only the core.
 ///
 /// **Privacy invariant:** activities with empty `clipped_segments` are
 /// dropped, never falling back to the raw `summary_polyline`. The
@@ -543,65 +540,78 @@ fn build_heat(
     // their alphas (so bloom=0 collapses to no-halo, bloom=2 doubles
     // both extent and presence). `alpha` scales just the sharp-core
     // opacity. Tuning factors clamp at 0 to keep stroke-opacity sane.
+    // The web preset keeps the halos at `WEB_GLOW` of their opacity: a
+    // lighter glow that costs a few hundred bytes, since every layer
+    // reuses the one path group.
+    const WEB_GLOW: f32 = 0.5;
     let bloom = tuning.bloom.max(0.0);
+    let halo_alpha = |a: f32| (a * bloom * if web { WEB_GLOW } else { 1.0 }).min(1.0);
     let core_alpha = (theme.heat.alpha * tuning.alpha.max(0.0)).min(1.0);
-    let core_layer = ("heat", theme.heat.width, core_alpha);
+    let core_layer = ("heat-core", theme.heat.width, core_alpha);
 
-    let layers_owned: Vec<(&str, f32, f32)> = if web || bloom == 0.0 {
+    let layers: Vec<(&str, f32, f32)> = if bloom == 0.0 {
         vec![core_layer]
     } else {
         vec![
             (
                 "heat-outer",
                 theme.heat.width * theme.heat.glow_outer_ratio * bloom,
-                (theme.heat.glow_outer_alpha * bloom).min(1.0),
+                halo_alpha(theme.heat.glow_outer_alpha),
             ),
             (
                 "heat-inner",
                 theme.heat.width * theme.heat.glow_inner_ratio * bloom,
-                (theme.heat.glow_inner_alpha * bloom).min(1.0),
+                halo_alpha(theme.heat.glow_inner_alpha),
             ),
             core_layer,
         ]
     };
-    let layers: &[(&str, f32, f32)] = &layers_owned;
 
-    let mut stack = Group::new().set("class", "heat-stack");
-    for &(class, width, alpha) in layers {
-        // Halos use NORMAL blend (a wash, no darkening). The sharp core
-        // takes the theme's blend: multiply presses rides into cream
-        // paper, screen lifts them off a dark ground.
-        let blend = if class == "heat" {
-            format!("mix-blend-mode: {}", theme.heat_blend().as_css())
-        } else {
-            "mix-blend-mode: normal".to_string()
-        };
-        let mut g = Group::new()
-            .set("class", class)
-            .set("fill", "none")
-            .set("stroke", theme.heat.color.as_str())
-            .set("stroke-width", width)
-            .set("stroke-opacity", alpha)
-            .set("stroke-linecap", "round")
-            .set("stroke-linejoin", "round")
-            .set("style", blend);
-        for (obf, d) in &decoded {
-            let act = obf.activity();
-            let mut p = Path::new().set("d", d.clone());
-            // data-* attrs only on the sharp core layer (web JS targets
-            // it). `anonymize` suppresses them entirely so a published
-            // SVG cannot be linked back to the operator's Strava profile
-            // via athlete_id or gear_id.
-            if class == "heat" && !tuning.anonymize {
-                p = p
-                    .set("data-rider", act.athlete_id.to_string())
-                    .set("data-bike", act.gear_id.clone().unwrap_or_default())
-                    .set("data-year", act.start_date.format("%Y").to_string())
-                    .set("data-type", act.activity_type.as_data_attr());
-            }
-            g = g.add(p);
+    // The ride paths are written once, bare, under `#heat-paths`; each
+    // layer is a `<use>` whose stroke, width and opacity the clone
+    // inherits. A path that set any of those itself would pin every
+    // layer to one value, so paths carry only `d` and data attrs.
+    let mut paths = Group::new().set("id", "heat-paths").set("class", "heat");
+    for (obf, d) in &decoded {
+        let act = obf.activity();
+        let mut p = Path::new().set("d", d.clone());
+        // data-* attrs feed consumer JS (`.heat path[data-type]`).
+        // `anonymize` suppresses them entirely so a published SVG
+        // cannot be linked back to the operator's Strava profile via
+        // athlete_id or gear_id.
+        if !tuning.anonymize {
+            p = p
+                .set("data-rider", act.athlete_id.to_string())
+                .set("data-bike", act.gear_id.clone().unwrap_or_default())
+                .set("data-year", act.start_date.format("%Y").to_string())
+                .set("data-type", act.activity_type.as_data_attr());
         }
-        stack = stack.add(g);
+        paths = paths.add(p);
+    }
+
+    let mut stack = Group::new()
+        .set("class", "heat-stack")
+        .set("fill", "none")
+        .set("stroke", theme.heat.color.as_str())
+        .set("stroke-linecap", "round")
+        .set("stroke-linejoin", "round")
+        .add(Definitions::new().add(paths));
+    for (class, width, alpha) in layers {
+        let mut u = Use::new()
+            .set("href", "#heat-paths")
+            .set("class", class)
+            .set("stroke-width", width)
+            .set("stroke-opacity", alpha);
+        // Halos composite normally (a wash, no darkening). The sharp
+        // core takes the theme's blend: multiply presses rides into
+        // cream paper, screen lifts them off a dark ground.
+        if class == "heat-core" {
+            let blend = theme.heat_blend();
+            if blend != HeatBlend::Normal {
+                u = u.set("style", format!("mix-blend-mode: {}", blend.as_css()));
+            }
+        }
+        stack = stack.add(u);
     }
     stack
 }
@@ -771,8 +781,9 @@ mod tests {
         assert!(svg.contains("data-bike=\"bSCRUBBED1\""));
         assert!(svg.contains("data-type=\"Ride\""));
 
-        // Web variant: single-layer heat, precision-1 coords, no
-        // typography group.
+        // Web variant: no typography, and a lighter glow. Every layer
+        // is a <use> of the one path group, so each ride's path is
+        // written once whatever the layer count.
         let svg_web = render(
             &cfg,
             &basemap,
@@ -784,15 +795,156 @@ mod tests {
             HeatTuning::default(),
         )
         .expect("render web");
-        assert!(svg_web.contains("class=\"heat\""));
+        for layer in ["heat-outer", "heat-inner", "heat-core"] {
+            assert_eq!(
+                svg_web.matches(&format!("class=\"{layer}\"")).count(),
+                1,
+                "{layer} layer in the web variant"
+            );
+        }
+        assert_eq!(svg.matches("data-rider=\"1\"").count(), 2);
+        assert_eq!(svg_web.matches("data-rider=\"1\"").count(), 2);
+        let outer_alpha = |s: &str| -> f32 {
+            let tail = &s[s.find("class=\"heat-outer\"").expect("outer")..];
+            let at = tail.find("stroke-opacity=\"").expect("opacity") + 16;
+            tail[at..at + tail[at..].find('"').unwrap()]
+                .parse()
+                .unwrap()
+        };
         assert!(
-            !svg_web.contains("class=\"heat-outer\""),
-            "web variant should drop the outer halo layer"
+            outer_alpha(&svg_web) < outer_alpha(&svg),
+            "web glow should be lighter than the poster's"
         );
+    }
+
+    /// The SVG between the `#heat-paths` group's open and close tags.
+    fn heat_paths_inner(svg: &str) -> &str {
+        let open = "<g class=\"heat\" id=\"heat-paths\">";
+        let start = svg.find(open).expect("heat-paths group") + open.len();
+        let end = start + svg[start..].find("</g>").expect("group close");
+        &svg[start..end]
+    }
+
+    /// Small synthetic heat-only render on a 300x300 viewbox.
+    fn small_heat_render(web: bool) -> String {
+        let mut cfg = config::load("fixtures/config.toml").expect("config loads");
+        cfg.viewbox_width = 300;
+        cfg.viewbox_height = 300;
+        cfg.radius_m = 4000.0;
+        let theme = theme::load_named("cycle_heat", None).expect("embedded theme loads");
+        // Densify each leg to ~100 m steps so no hop trips the 600 m
+        // gap break and the rides draw as continuous lines.
+        let coords = |pts: &[(f64, f64)]| {
+            let mut c = Vec::new();
+            for w in pts.windows(2) {
+                for i in 0..20 {
+                    let t = i as f64 / 20.0;
+                    c.push(geo_types::Coord {
+                        x: w[0].1 + (w[1].1 - w[0].1) * t,
+                        y: w[0].0 + (w[1].0 - w[0].0) * t,
+                    });
+                }
+            }
+            let &(y, x) = pts.last().unwrap();
+            c.push(geo_types::Coord { x, y });
+            polyline::encode_coordinates(c, 5).expect("encode")
+        };
+        let activities = vec![
+            synthetic_activity(
+                1,
+                coords(&[(42.95, -85.66), (42.96, -85.65), (42.97, -85.64)]),
+            ),
+            synthetic_activity(
+                2,
+                coords(&[(42.97, -85.68), (42.95, -85.64), (42.94, -85.62)]),
+            ),
+        ];
+        let obf = obfuscation::apply(
+            activities,
+            ObfuscationParams {
+                home_lat: cfg.home_lat,
+                home_lng: cfg.home_lng,
+                radius_m: 0.0,
+                salt: None,
+                offset_m: 750.0,
+            },
+        )
+        .expect("obfuscate");
+        let tuning = HeatTuning {
+            bloom: 1.8,
+            ..HeatTuning::default()
+        };
+        render(
+            &cfg,
+            &Basemap::default(),
+            &obf,
+            &theme,
+            true,
+            web,
+            false,
+            tuning,
+        )
+        .expect("render ok")
+    }
+
+    #[test]
+    fn heat_paths_set_no_presentation_attrs() {
+        for web in [false, true] {
+            let svg = small_heat_render(web);
+            let inner = heat_paths_inner(&svg);
+            assert_eq!(inner.matches("<path").count(), 2);
+            for attr in ["stroke", "fill", "opacity", "style"] {
+                assert!(!inner.contains(attr), "a heat path sets {attr}: {inner}");
+            }
+            assert_eq!(svg.matches("<use ").count(), 3);
+        }
+    }
+
+    /// Rasterizes the use-stack render and the same render with every
+    /// `<use>` expanded into a group holding a copy of the paths (the
+    /// shape the stack had before), and compares the pixels. Needs
+    /// `rsvg-convert` on PATH; `just check-pixels` runs it.
+    #[test]
+    #[ignore = "needs rsvg-convert; run with `just check-pixels`"]
+    fn use_stack_matches_inlined_layers_in_pixels() {
+        let svg = small_heat_render(false);
+        let inner = heat_paths_inner(&svg).to_string();
+        let defs_start = svg.find("<defs>\n<g class=\"heat\"").expect("heat defs");
+        let defs_end = defs_start + svg[defs_start..].find("</defs>").unwrap() + "</defs>".len();
+        let mut inlined = format!("{}{}", &svg[..defs_start], &svg[defs_end..]);
+        while let Some(at) = inlined.find("<use ") {
+            let end = at + inlined[at..].find("/>").unwrap();
+            let attrs = inlined[at + 5..end].replace("href=\"#heat-paths\" ", "");
+            inlined.replace_range(at..end + 2, &format!("<g {attrs}>{inner}</g>"));
+        }
+        assert!(!inlined.contains("heat-paths"));
+
+        let dir = std::env::temp_dir().join(format!("patinate-pixels-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let raster = |name: &str, body: &str| -> Vec<u8> {
+            let src = dir.join(format!("{name}.svg"));
+            let png = dir.join(format!("{name}.png"));
+            std::fs::write(&src, body).unwrap();
+            let ok = std::process::Command::new("rsvg-convert")
+                .arg(&src)
+                .arg("-o")
+                .arg(&png)
+                .status()
+                .expect("rsvg-convert runs")
+                .success();
+            assert!(ok, "rsvg-convert failed on {name}");
+            std::fs::read(&png).unwrap()
+        };
+        let a = raster("use", &svg);
+        let b = raster("inlined", &inlined);
+        let no_heat: String = svg.lines().filter(|l| !l.starts_with("<use ")).collect();
+        let bare = raster("bare", &no_heat);
+        std::fs::remove_dir_all(&dir).ok();
         assert!(
-            !svg_web.contains("class=\"heat-inner\""),
-            "web variant should drop the inner halo layer"
+            a != bare,
+            "the heat must draw, or the comparison proves nothing"
         );
+        assert!(a == b, "use stack and inlined layers rasterize differently");
     }
 
     #[test]

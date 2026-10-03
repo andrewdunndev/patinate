@@ -195,8 +195,7 @@ struct RenderArgs {
 
     /// Web-embed preset: strip detail for inline-on-page use. Drops
     /// tertiary + residential roads, drops typography (consumer page
-    /// adds its own), uses single-layer heat (no glow stack), coord
-    /// precision 1. Targets ~500KB SVG.
+    /// adds its own), lightens the heat glow, coord precision 1.
     #[arg(long)]
     web: bool,
 
@@ -454,7 +453,7 @@ fn render_cmd(args: RenderArgs) -> Result<()> {
     )?;
     tracing::info!(kept = obfuscated.len(), "after obfuscation");
 
-    // `--web` semantics (single-layer heat, precision-1 coords, dropped
+    // `--web` semantics (lighter glow, precision-1 coords, dropped
     // minor road tiers, no own typography) all live inside compose::render.
     // The CLI just passes the flag through.
     let svg = compose::render(

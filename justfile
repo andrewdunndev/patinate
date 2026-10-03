@@ -64,6 +64,10 @@ web: example themes
     cp assets/example-noir.png assets/example-gallery.png web/public/
     for f in assets/themes/*.png; do cp "$f" "web/public/theme-$(basename "$f")"; done
 
+# run the rasterizing tests (need rsvg-convert on PATH)
+check-pixels:
+    cargo test -- --ignored
+
 # remove generated artifacts under assets/ and public/
 clean:
     rm -f assets/example-*.png assets/themes/*.png public/index.html public/heatmap-web.svg

@@ -205,8 +205,8 @@ Generic figment override: `PATINATE_<SECTION>__<KEY>`. Example:
 - **Overpass rate limits:** 429/5xx bails immediately. Use
   `PATINATE_OVERPASS_ENDPOINT` for a private mirror.
 - **No JSON-log conventions.** `tracing` keys are ad-hoc.
-- **`--web` is a preset, not a separate renderer.** Drops typography,
-  glow stack, and minor road tiers; trims coords. Pair with
+- **`--web` is a preset, not a separate renderer.** Drops typography
+  and minor road tiers, lightens the glow, trims coords. Pair with
   `--transparent-bg` for inline embeds.
 
 </details>
