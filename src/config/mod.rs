@@ -80,7 +80,8 @@ pub struct ValidatedConfig {
     /// Seeds the hidden zone; required by `obfuscation::apply()` when
     /// the radius is positive. Debug output is redacted.
     pub privacy_salt: Option<PrivacySalt>,
-    /// Bound on the secret offset of the hidden zone from home, metres.
+    /// Bound on the secret offset of the hidden zone from home, metres;
+    /// `obfuscation::apply()` requires at least `MIN_OFFSET_M` (250).
     pub privacy_offset_m: f64,
     pub strava_client_id: Option<String>,
     pub strava_client_secret: Option<String>,

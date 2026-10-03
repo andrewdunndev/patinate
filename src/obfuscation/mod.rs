@@ -47,6 +47,10 @@ public repo):
 or set PATINATE_PRIVACY__SALT. Keep it stable: a new salt moves the zone, and \
 two renders with different salts narrow down home.";
 
+/// Floor on `offset_m` for any positive radius. At 0 a circle fit
+/// finds home within metres; at 50 m, within about 30 m.
+pub const MIN_OFFSET_M: f64 = 250.0;
+
 /// Operator secret seeding the hidden zone. Never rendered, never logged.
 #[derive(Clone)]
 pub struct PrivacySalt(Vec<u8>);
@@ -96,6 +100,7 @@ pub struct ObfuscationParams {
     pub home_lng: f64,
     pub radius_m: f64,
     /// Bound on the secret offset of the zone centre from home, metres.
+    /// At least `MIN_OFFSET_M` whenever `radius_m > 0`.
     pub offset_m: f64,
     /// Required when `radius_m > 0`; `apply()` refuses to run without it.
     pub salt: Option<PrivacySalt>,
@@ -192,6 +197,14 @@ pub fn apply(
         }
     }
     let zone = if params.radius_m > 0.0 {
+        if params.offset_m < MIN_OFFSET_M {
+            bail!(
+                "[privacy].offset_m = {} is below the {MIN_OFFSET_M} m floor. A \
+                 smaller offset leaves the zone nearly centred on home, which \
+                 a circle fit finds. Raise it or leave it out for the default.",
+                params.offset_m
+            );
+        }
         let salt = params.salt.as_ref().ok_or_else(|| anyhow!(MISSING_SALT))?;
         Some(HiddenZone::derive(&params, salt))
     } else {
@@ -950,6 +963,10 @@ mod tests {
             let z1 = HiddenZone::derive(&params(250.0, s.clone()), &s);
             let z2 = HiddenZone::derive(&params(1000.0, s.clone()), &s);
             assert_eq!(z1.center, z2.center, "salt {i}: centre moved with r");
+            // The radius is fixed by r and offset_m alone: one that moved
+            // with the drawn offset would place home on a known ring.
+            assert_eq!(z1.radius_m, 250.0 + RHO + 1.0, "salt {i}: radius moved");
+            assert_eq!(z2.radius_m, 1000.0 + RHO + 1.0, "salt {i}: radius moved");
             for (z, r) in [(&z1, 250.0), (&z2, 1000.0)] {
                 let off = haversine_m(HOME.0, HOME.1, z.center.0, z.center.1);
                 assert!(off <= RHO + 0.01, "salt {i}: offset {off:.2} > rho");
@@ -1078,5 +1095,26 @@ mod tests {
         let p = params(250.0, salt());
         let shown = format!("{p:?}");
         assert!(!shown.contains("test-salt-not-a-secret"), "{shown}");
+    }
+
+    #[test]
+    fn offset_below_floor_is_refused() {
+        // A small offset quietly brings back the home-centred circle.
+        let ride = activity_from(1, &[to_latlng(5000.0, 0.0), to_latlng(6000.0, 0.0)]);
+        for small in [0.0, 50.0, MIN_OFFSET_M - 1.0] {
+            let mut p = params(250.0, salt());
+            p.offset_m = small;
+            let err = apply(vec![ride.clone()], p).unwrap_err().to_string();
+            assert!(
+                err.contains("[privacy].offset_m") && err.contains("250 m floor"),
+                "{err}"
+            );
+        }
+        let mut p = params(250.0, salt());
+        p.offset_m = MIN_OFFSET_M;
+        assert!(apply(vec![ride.clone()], p).is_ok());
+        let mut off = params(0.0, salt());
+        off.offset_m = 0.0;
+        assert!(apply(vec![ride], off).is_ok(), "radius 0 needs no offset");
     }
 }
