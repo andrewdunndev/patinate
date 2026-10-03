@@ -77,13 +77,15 @@ pub struct LatLon {
 /// Classified, render-ready features after tag interpretation.
 ///
 /// Water comes in two flavors: polygons (lakes, ponds — `natural=water`)
-/// get filled, lines (rivers, streams — `waterway=*`) get stroked. Same
+/// get filled, lines (rivers, canals, streams — `waterway=*`) get stroked.
+/// Streams sit apart so the web preset can leave them out. Same
 /// distinction matters less for parks (almost all polygons in OSM).
 #[derive(Debug, Default, Clone)]
 pub struct Basemap {
     pub roads: Vec<Road>,
     pub water_polygons: Vec<Vec<LatLon>>,
     pub water_lines: Vec<Vec<LatLon>>,
+    pub streams: Vec<Vec<LatLon>>,
     pub parks: Vec<Vec<LatLon>>,
 }
 
@@ -157,8 +159,13 @@ fn classify_way(way: &WayElement, bm: &mut Basemap) {
         bm.water_polygons.push(way.geometry.clone());
         return;
     }
-    if way.tags.contains_key("waterway") {
-        bm.water_lines.push(way.geometry.clone());
+    if let Some(waterway) = way.tags.get("waterway") {
+        let lines = if waterway == "stream" {
+            &mut bm.streams
+        } else {
+            &mut bm.water_lines
+        };
+        lines.push(way.geometry.clone());
         return;
     }
     if matches!(

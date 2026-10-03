@@ -111,9 +111,12 @@ pub fn render(
         compact,
     );
 
-    // Water lines (rivers, streams — stroke). The Grand River is here.
+    // Water lines (rivers, canals, streams — stroke). The Grand River is
+    // here. The web preset leaves streams out: they are most of the
+    // water bytes and read as noise at embed size.
+    let streams = if web { &[][..] } else { &basemap.streams[..] };
     let water_lines = build_line_group(
-        &basemap.water_lines,
+        basemap.water_lines.iter().chain(streams),
         theme.water.as_str(),
         theme.water_line_width,
         "water-lines",
@@ -407,8 +410,8 @@ fn build_road_layer(
 }
 
 /// Build an open-line group from a list of polylines (rivers, streams).
-fn build_line_group(
-    lines: &[Vec<LatLon>],
+fn build_line_group<'a>(
+    lines: impl IntoIterator<Item = &'a Vec<LatLon>>,
     stroke: &str,
     width: f32,
     class: &str,
@@ -885,6 +888,53 @@ mod tests {
         );
     }
 
+    /// Posters stroke streams with the rivers; the web preset leaves
+    /// them out and keeps the rivers.
+    #[test]
+    fn web_drops_streams_keeps_rivers() {
+        let cfg = config::load("fixtures/config.toml").expect("config loads");
+        let theme = theme::load_named("noir_heat", None).expect("embedded theme loads");
+        let line = |lng: f64| {
+            vec![
+                LatLon {
+                    lat: 42.95,
+                    lon: lng,
+                },
+                LatLon {
+                    lat: 42.97,
+                    lon: lng,
+                },
+            ]
+        };
+        let basemap = Basemap {
+            water_lines: vec![line(-85.66)],
+            streams: vec![line(-85.64)],
+            ..Basemap::default()
+        };
+        let water_lines = |web: bool| -> String {
+            let svg = render(
+                &cfg,
+                &basemap,
+                &[],
+                &theme,
+                false,
+                web,
+                false,
+                Fit::Contain,
+                HeatTuning::default(),
+            )
+            .expect("render ok");
+            let start = svg
+                .find("class=\"water-lines\"")
+                .expect("water-lines group");
+            let end = start + svg[start..].find("</g>").expect("group close");
+            svg[start..end].to_string()
+        };
+        // Each line is one M..L run, merged or not.
+        assert_eq!(water_lines(false).matches('M').count(), 2, "poster");
+        assert_eq!(water_lines(true).matches('M').count(), 1, "web");
+    }
+
     /// The SVG between the `#heat-paths` group's open and close tags.
     fn heat_paths_inner(svg: &str) -> &str {
         let open = "<g class=\"heat\" id=\"heat-paths\">";
@@ -1225,8 +1275,8 @@ mod tests {
     /// cycle.dunn.dev's landing render (`--theme cycle_heat --web
     /// --transparent-bg --anonymize --obfuscation-radius-m 1000
     /// --cycling --heat-alpha 4.0 --fit cover`) on the fixtures, held
-    /// to its byte budget at both crops. Measured 322 KB and 356 KB
-    /// when set; the bounds leave about 5% headroom.
+    /// to the 300 KB raw target at both crops. Measured 260 KB and
+    /// 286 KB when set.
     #[test]
     fn web_payload_stays_in_budget() {
         let mut cfg = config::load("fixtures/config.toml").expect("config loads");
@@ -1257,7 +1307,7 @@ mod tests {
             anonymize: true,
             ..HeatTuning::default()
         };
-        for (w, h, budget) in [(1600, 900, 340_000), (1200, 1600, 375_000)] {
+        for (w, h, budget) in [(1600, 900, 300_000), (1200, 1600, 300_000)] {
             cfg.viewbox_width = w;
             cfg.viewbox_height = h;
             let svg = render(

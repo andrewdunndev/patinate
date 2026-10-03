@@ -195,9 +195,9 @@ struct RenderArgs {
     heat_only: bool,
 
     /// Web-embed preset: strip detail for inline-on-page use. Drops
-    /// tertiary + residential roads, drops typography (consumer page
-    /// adds its own), lightens the heat glow, and writes compact paths
-    /// sized to the viewbox (see `render::path`).
+    /// tertiary + residential roads and streams, drops typography
+    /// (consumer page adds its own), lightens the heat glow, and writes
+    /// compact paths sized to the viewbox (see `render::path`).
     #[arg(long)]
     web: bool,
 
@@ -370,6 +370,7 @@ fn render_cmd(args: RenderArgs) -> Result<()> {
         roads = basemap.roads.len(),
         water_polygons = basemap.water_polygons.len(),
         water_lines = basemap.water_lines.len(),
+        streams = basemap.streams.len(),
         parks = basemap.parks.len(),
         "OSM basemap loaded (raw)"
     );
@@ -469,7 +470,7 @@ fn render_cmd(args: RenderArgs) -> Result<()> {
     tracing::info!(kept = obfuscated.len(), "after obfuscation");
 
     // `--web` semantics (lighter glow, compact paths, dropped
-    // minor road tiers, no own typography) all live inside compose::render.
+    // minor road tiers and streams, no own typography) all live inside compose::render.
     // The CLI just passes the flag through.
     let svg = compose::render(
         &cfg,
