@@ -16,6 +16,7 @@ use svg::node::element::{
 use crate::config::ValidatedConfig;
 use crate::obfuscation::ObfuscatedActivity;
 use crate::osm::{Basemap, LatLon};
+use crate::render::path::{Compact, signed_area2};
 use crate::render::projection::{Fit, Projection};
 use crate::render::theme::{HeatBlend, RoadTier, Theme};
 use crate::render::typography;
@@ -53,8 +54,9 @@ impl Default for HeatTuning {
 
 /// Top-level entry. Returns the SVG document as a string.
 /// - `heat_only`: skip basemap (water, parks, roads).
-/// - `web`: web-embed preset — a lighter glow, coord precision 1, no
-///   own typography. Targets a small inline SVG for a consumer page.
+/// - `web`: web-embed preset — a lighter glow, compact merged paths
+///   (`render::path::Compact`), no own typography. Targets a small
+///   inline SVG for a consumer page.
 /// - `transparent_bg`: skip the bg rect so the SVG paints over the
 ///   consumer page's own background. Combine with `web` for inline.
 /// - `fit`: letterbox (`Contain`) or crop (`Cover`) the radius circle
@@ -85,6 +87,10 @@ pub fn render(
         fit,
     )?;
 
+    // The web preset's compact path writer; posters keep plain paths.
+    let compact = web.then(|| Compact::for_viewbox(viewbox_w, viewbox_h));
+    let compact = compact.as_ref();
+
     // Defs: fade gradients.
     let defs = build_defs(theme);
 
@@ -102,6 +108,7 @@ pub fn render(
         theme.water.as_str(),
         "water",
         &proj,
+        compact,
     );
 
     // Water lines (rivers, streams — stroke). The Grand River is here.
@@ -111,20 +118,26 @@ pub fn render(
         theme.water_line_width,
         "water-lines",
         &proj,
+        compact,
     );
 
     // Parks (filled polygons).
-    let parks = build_polygon_group(&basemap.parks, theme.parks.as_str(), "parks", &proj);
+    let parks = build_polygon_group(
+        &basemap.parks,
+        theme.parks.as_str(),
+        "parks",
+        &proj,
+        compact,
+    );
 
     // Roads (one sub-group per tier, drawn residential first so motorways
     // sit on top). Web mode drops tertiary + residential to keep the
     // inline SVG inside its file-size budget.
-    let roads = build_roads(basemap, theme, &proj, web);
+    let roads = build_roads(basemap, theme, &proj, web, compact);
 
     // Heat: one path group drawn by a three-layer <use> glow stack.
-    // Web variant lightens the glow and drops one digit of float
-    // precision in `d` strings.
-    let heat = build_heat(activities, theme, &proj, web, tuning);
+    // Web variant lightens the glow and writes compact paths.
+    let heat = build_heat(activities, theme, &proj, web, compact, tuning);
 
     // Fades (top + bottom rects pointing at the gradients).
     let fades = build_fades(viewbox_w, viewbox_h, theme);
@@ -317,23 +330,56 @@ fn build_fades(viewbox_w: f64, viewbox_h: f64, theme: &Theme) -> Group {
         .add(bot_rect)
 }
 
-/// Build a closed-polygon group from a list of boundary rings.
-fn build_polygon_group(rings: &[Vec<LatLon>], fill: &str, class: &str, proj: &Projection) -> Group {
-    let mut g = Group::new()
-        .set("class", class)
-        .set("fill", fill)
-        .set("stroke", "none");
-    for ring in rings {
-        if ring.len() < 2 {
-            continue;
+/// Add one `<path>` per line to `g`, or under `compact` (the web
+/// preset) a single merged path. Merging is lossless here: every line
+/// in a basemap group shares one opaque style, and rings are turned to
+/// one winding first so the nonzero rule fills them as a union.
+fn add_lines<'a>(
+    mut g: Group,
+    lines: impl IntoIterator<Item = &'a Vec<LatLon>>,
+    closed: bool,
+    proj: &Projection,
+    compact: Option<&Compact>,
+) -> Group {
+    let Some(c) = compact else {
+        for line in lines {
+            if line.len() < 2 {
+                continue;
+            }
+            let d = polyline_to_path(line, proj, closed);
+            if !d.is_empty() {
+                g = g.add(Path::new().set("d", d));
+            }
         }
-        let d = polyline_to_path(ring, proj, true);
-        if d.is_empty() {
-            continue;
+        return g;
+    };
+    let mut d = String::new();
+    for line in lines {
+        let mut pts: Vec<(f64, f64)> = line.iter().map(|p| proj.project_latlon(*p)).collect();
+        if closed && signed_area2(&pts) < 0.0 {
+            pts.reverse();
         }
+        c.write(&mut d, &pts, closed);
+    }
+    if !d.is_empty() {
         g = g.add(Path::new().set("d", d));
     }
     g
+}
+
+/// Build a closed-polygon group from a list of boundary rings.
+fn build_polygon_group(
+    rings: &[Vec<LatLon>],
+    fill: &str,
+    class: &str,
+    proj: &Projection,
+    compact: Option<&Compact>,
+) -> Group {
+    let g = Group::new()
+        .set("class", class)
+        .set("fill", fill)
+        .set("stroke", "none");
+    add_lines(g, rings, true, proj, compact)
 }
 
 /// Build one tier's stroke layer. Used by both the solid road pass
@@ -345,6 +391,7 @@ fn build_road_layer(
     class: &str,
     opacity: Option<f32>,
     proj: &Projection,
+    compact: Option<&Compact>,
 ) -> Group {
     let mut g = Group::new()
         .set("class", class.to_string())
@@ -356,16 +403,7 @@ fn build_road_layer(
     if let Some(o) = opacity {
         g = g.set("opacity", o);
     }
-    for geom in geoms {
-        if geom.len() < 2 {
-            continue;
-        }
-        let d = polyline_to_path(geom, proj, false);
-        if !d.is_empty() {
-            g = g.add(Path::new().set("d", d));
-        }
-    }
-    g
+    add_lines(g, geoms.iter().copied(), false, proj, compact)
 }
 
 /// Build an open-line group from a list of polylines (rivers, streams).
@@ -375,31 +413,28 @@ fn build_line_group(
     width: f32,
     class: &str,
     proj: &Projection,
+    compact: Option<&Compact>,
 ) -> Group {
-    let mut g = Group::new()
+    let g = Group::new()
         .set("class", class)
         .set("fill", "none")
         .set("stroke", stroke)
         .set("stroke-width", width)
         .set("stroke-linecap", "round")
         .set("stroke-linejoin", "round");
-    for line in lines {
-        if line.len() < 2 {
-            continue;
-        }
-        let d = polyline_to_path(line, proj, false);
-        if d.is_empty() {
-            continue;
-        }
-        g = g.add(Path::new().set("d", d));
-    }
-    g
+    add_lines(g, lines, false, proj, compact)
 }
 
 /// Build the road group: one sub-group per tier, residential first.
 /// `web` skips the two minor tiers (tertiary + residential) so all
 /// `--web` semantics live in one place.
-fn build_roads(basemap: &Basemap, theme: &Theme, proj: &Projection, web: bool) -> Group {
+fn build_roads(
+    basemap: &Basemap,
+    theme: &Theme,
+    proj: &Projection,
+    web: bool,
+    compact: Option<&Compact>,
+) -> Group {
     // Bucket roads by tier in a single pass.
     let mut buckets: HashMap<RoadTier, Vec<&Vec<LatLon>>> = HashMap::new();
     for road in &basemap.roads {
@@ -441,6 +476,7 @@ fn build_roads(basemap: &Basemap, theme: &Theme, proj: &Projection, web: bool) -
                     &format!("{class}-glow"),
                     Some(0.05),
                     proj,
+                    compact,
                 ));
             }
             // Solid stroke.
@@ -451,6 +487,7 @@ fn build_roads(basemap: &Basemap, theme: &Theme, proj: &Projection, web: bool) -
                 class,
                 None,
                 proj,
+                compact,
             ));
         }
     }
@@ -477,8 +514,9 @@ fn tier_class(tier: RoadTier) -> &'static str {
 /// warm_beige) lift the halo opacity in their JSON so the bloom registers
 /// against a warm background.
 ///
-/// **Web (web=true):** halo opacity halved, coord precision dropped
-/// from 2 to 1 digit. `bloom = 0` keeps only the core.
+/// **Web (web=true):** halo opacity halved and paths written by
+/// `Compact`, each ride still its own path so overlaps build heat.
+/// `bloom = 0` keeps only the core.
 ///
 /// **Privacy invariant:** activities with empty `clipped_segments` are
 /// dropped, never falling back to the raw `summary_polyline`. The
@@ -488,10 +526,9 @@ fn build_heat(
     theme: &Theme,
     proj: &Projection,
     web: bool,
+    compact: Option<&Compact>,
     tuning: HeatTuning,
 ) -> Group {
-    let precision: usize = if web { 1 } else { 2 };
-
     // Path-break threshold in viewbox units, derived from the projection
     // so the value scales with viewport and radius. 600 m is wider than
     // any plausible bike-trail bridge but narrower than the Grand River
@@ -526,7 +563,13 @@ fn build_heat(
                 .iter()
                 .map(|&(lat, lng)| proj.project(lat, lng))
                 .collect();
-            let piece = points_to_heat_path(&projected, precision, max_gap_units);
+            if let Some(c) = compact {
+                for run in split_at_gaps(&projected, max_gap_units) {
+                    c.write(&mut d, run, false);
+                }
+                continue;
+            }
+            let piece = points_to_heat_path(&projected, max_gap_units);
             if piece.is_empty() {
                 continue;
             }
@@ -652,29 +695,45 @@ fn points_to_path_string(pts: &[(f64, f64)]) -> String {
     s
 }
 
+/// Split a projected ride into runs wherever consecutive points sit
+/// farther apart than `max_gap_units` (see `points_to_heat_path`).
+fn split_at_gaps(pts: &[(f64, f64)], max_gap_units: f64) -> Vec<&[(f64, f64)]> {
+    let max_gap_sq = max_gap_units * max_gap_units;
+    let mut runs = Vec::new();
+    let mut start = 0;
+    for i in 1..pts.len() {
+        let (dx, dy) = (pts[i].0 - pts[i - 1].0, pts[i].1 - pts[i - 1].1);
+        if dx * dx + dy * dy > max_gap_sq {
+            runs.push(&pts[start..i]);
+            start = i;
+        }
+    }
+    runs.push(&pts[start..]);
+    runs
+}
+
 /// Heat-only variant. Strava `summary_polyline` is heavily decimated;
 /// for some long rides two consecutive points end up far apart and a
 /// straight `L` between them draws across geography the ride doesn't
 /// actually cross. When a segment exceeds `max_gap_units`, emit `M`
 /// to break the path instead of bridging the gap.
 ///
-/// `precision` is the float decimal precision used in the `d` string.
-/// 2 for poster output (sub-pixel positioning at 1200x1600), 1 for the
-/// web preset (file-size budget; visual diff at viewport scale is nil).
+/// Poster output only, at two decimals; the web preset splits rides
+/// with `split_at_gaps` and writes them with `Compact`.
 ///
 /// `max_gap_units` is the threshold in projected SVG units beyond which
 /// consecutive points are treated as discontinuous. The caller derives
 /// this from the projection (units-per-meter * threshold-in-meters) so
 /// the value scales with viewport and radius rather than being a magic
 /// number tuned to a single resolution.
-fn points_to_heat_path(pts: &[(f64, f64)], precision: usize, max_gap_units: f64) -> String {
+fn points_to_heat_path(pts: &[(f64, f64)], max_gap_units: f64) -> String {
     let max_gap_sq = max_gap_units * max_gap_units;
     if pts.len() < 2 {
         return String::new();
     }
     let mut s = String::with_capacity(pts.len() * 16);
     let (x0, y0) = pts[0];
-    let _ = write!(s, "M{:.*} {:.*}", precision, x0, precision, y0);
+    let _ = write!(s, "M{x0:.2} {y0:.2}");
     let mut prev = pts[0];
     for &(x, y) in &pts[1..] {
         let dx = x - prev.0;
@@ -684,7 +743,7 @@ fn points_to_heat_path(pts: &[(f64, f64)], precision: usize, max_gap_units: f64)
         } else {
             'L'
         };
-        let _ = write!(s, " {cmd}{:.*} {:.*}", precision, x, precision, y);
+        let _ = write!(s, " {cmd}{x:.2} {y:.2}");
         prev = (x, y);
     }
     s
@@ -809,7 +868,10 @@ mod tests {
             );
         }
         assert_eq!(svg.matches("data-rider=\"1\"").count(), 2);
-        assert_eq!(svg_web.matches("data-rider=\"1\"").count(), 2);
+        // Every hop in this sparse ride breaks at the 600 m gap, so it
+        // draws nothing; the web writer drops it rather than ship a
+        // path of bare movetos.
+        assert_eq!(svg_web.matches("data-rider=\"1\"").count(), 0);
         let outer_alpha = |s: &str| -> f32 {
             let tail = &s[s.find("class=\"heat-outer\"").expect("outer")..];
             let at = tail.find("stroke-opacity=\"").expect("opacity") + 16;
@@ -1158,5 +1220,65 @@ mod tests {
         assert!(svg.len() >= 500_000, "svg too small: {} bytes", svg.len());
 
         eprintln!("render_smoke: svg size = {} bytes", svg.len());
+    }
+
+    /// cycle.dunn.dev's landing render (`--theme cycle_heat --web
+    /// --transparent-bg --anonymize --obfuscation-radius-m 1000
+    /// --cycling --heat-alpha 4.0 --fit cover`) on the fixtures, held
+    /// to its byte budget at both crops. Measured 322 KB and 356 KB
+    /// when set; the bounds leave about 5% headroom.
+    #[test]
+    fn web_payload_stays_in_budget() {
+        let mut cfg = config::load("fixtures/config.toml").expect("config loads");
+        let theme = theme::load_named("cycle_heat", None).expect("theme loads");
+        let mut basemap = osm::load("fixtures/grand-rapids.osm.json.gz").expect("osm loads");
+        osm::filter::refine(&mut basemap);
+        let raw = std::fs::read_to_string("fixtures/activities.json").expect("fixture");
+        let mut rides: Vec<Activity> = serde_json::from_str(&raw).expect("activities parse");
+        rides.retain(|a| {
+            matches!(
+                a.activity_type,
+                ActivityType::Ride | ActivityType::EBikeRide
+            ) && a.distance_m >= 1000.0
+        });
+        let obf = obfuscation::apply(
+            rides,
+            ObfuscationParams {
+                home_lat: cfg.home_lat,
+                home_lng: cfg.home_lng,
+                radius_m: 1000.0,
+                salt: cfg.privacy_salt.clone(),
+                offset_m: cfg.privacy_offset_m,
+            },
+        )
+        .expect("obfuscate");
+        let tuning = HeatTuning {
+            alpha: 4.0,
+            anonymize: true,
+            ..HeatTuning::default()
+        };
+        for (w, h, budget) in [(1600, 900, 340_000), (1200, 1600, 375_000)] {
+            cfg.viewbox_width = w;
+            cfg.viewbox_height = h;
+            let svg = render(
+                &cfg,
+                &basemap,
+                &obf,
+                &theme,
+                false,
+                true,
+                true,
+                Fit::Cover,
+                tuning,
+            )
+            .expect("render ok");
+            assert!(svg.contains("class=\"heat\""), "{w}x{h}: heat missing");
+            assert!(svg.contains("class=\"water\""), "{w}x{h}: water missing");
+            assert!(
+                svg.len() <= budget,
+                "{w}x{h}: {} bytes, over the {budget} byte budget",
+                svg.len()
+            );
+        }
     }
 }
