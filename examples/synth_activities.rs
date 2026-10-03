@@ -22,6 +22,14 @@ const CENTER: (f64, f64) = (42.9634, -85.6681);
 const MAX_FROM_CENTER_M: f64 = 18_000.0;
 const GRID: usize = 8;
 
+type Kind = (
+    ActivityType,
+    f64,
+    (f64, f64),
+    (f64, f64),
+    &'static [&'static str],
+);
+
 /// splitmix64: tiny, deterministic, no dependency.
 struct Rng(u64);
 
@@ -190,7 +198,7 @@ fn main() -> anyhow::Result<()> {
     let cells: Vec<Vec<usize>> = cells.into_iter().filter(|c| c.len() > 50).collect();
 
     // (type, share, km range, km/h range, gear choices)
-    let mix: [(ActivityType, f64, (f64, f64), (f64, f64), &[&str]); 5] = [
+    let mix: [Kind; 5] = [
         (
             ActivityType::Ride,
             0.35,

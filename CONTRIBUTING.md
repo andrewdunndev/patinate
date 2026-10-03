@@ -18,7 +18,6 @@ just               # list recipes: release, example, themes, site, web, clean
 cargo fmt
 cargo clippy --all-targets -- -D warnings
 cargo test --lib
-cargo test --lib -- --ignored render_smoke   # heavy fixture-based
 ```
 
 ## Test layout
@@ -88,9 +87,6 @@ activities fixture, mirror the pattern in
 `fixtures/`, deserialize, and run the rendering or filter stage.
 Use `osm::load("fixtures/grand-rapids.osm.json.gz")` to get the
 gzipped basemap; the loader transparently decompresses.
-
-If the test depends on the 35 MB raw JSON expansion, mark it
-`#[ignore]` so default runs stay fast.
 
 ## Reproducing visual changes
 

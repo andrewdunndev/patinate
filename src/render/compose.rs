@@ -910,11 +910,8 @@ mod tests {
     }
 
     /// Smoke test: load every fixture, render, and assert the SVG has
-    /// the expected layers and weight. Marked `#[ignore]` because it
-    /// parses a 33MB OSM JSON and produces a multi-MB SVG (slow under
-    /// debug). Run with `cargo test --lib -- --ignored render_smoke`.
+    /// the expected layers and weight. Needs the LFS basemap fixture.
     #[test]
-    #[ignore]
     fn render_smoke() {
         let cfg = config::load("fixtures/config.toml").expect("config loads");
         let theme = theme::load("themes/noir_heat.json").expect("theme loads");
