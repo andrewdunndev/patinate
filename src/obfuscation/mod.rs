@@ -11,14 +11,16 @@
 // The hidden zone is not the home circle. Clipping at one exact circle
 // on home puts every cut endpoint on that circle, and a circle fit over
 // the render recovers home to metres. Instead, with `r` the configured
-// radius and a secret salt:
-//   - the zone's centre sits a secret 0.6r..0.8r from home in a secret
-//     direction, and its radius is r plus that offset, so the disk of
-//     radius r around home stays inside it;
+// radius, `rho` the configured offset and a secret salt:
+//   - the zone's centre is drawn once from the salt, uniform over the
+//     disk of radius rho around home, and its radius is r + rho + 1 m,
+//     so the home disk stays strictly inside whatever offset is drawn;
 //   - each cut end is then trimmed a further 0..r along the track, an
 //     amount seeded by salt + activity id + crossing index, so the cut
 //     endpoints scatter over a band instead of lying on a circle.
-// A fit lands on the zone's centre, never on home. All randomness comes
+// A circle fit lands on the zone's centre, not on home. Tracks still
+// converge toward home inside the gap; this hides the address within
+// the zone, it does not erase the neighbourhood. All randomness comes
 // from SHA-256 over the salt, so repeated renders are identical and
 // cannot be averaged against each other.
 
@@ -93,6 +95,8 @@ pub struct ObfuscationParams {
     pub home_lat: f64,
     pub home_lng: f64,
     pub radius_m: f64,
+    /// Bound on the secret offset of the zone centre from home, metres.
+    pub offset_m: f64,
     /// Required when `radius_m > 0`; `apply()` refuses to run without it.
     pub salt: Option<PrivacySalt>,
 }
@@ -127,32 +131,29 @@ struct HiddenZone<'a> {
     center: (f64, f64),
     radius_m: f64,
     max_trim_m: f64,
-    radius_bits: u64,
     salt: &'a PrivacySalt,
 }
 
 impl<'a> HiddenZone<'a> {
     fn derive(params: &ObfuscationParams, salt: &'a PrivacySalt) -> Self {
-        let r = params.radius_m;
-        // The radius is part of the seed: renders at two radii get
-        // unrelated offsets, so their centres don't line up on home.
-        let radius_bits = r.to_bits();
-        let theta = std::f64::consts::TAU * salt.unit(b"zone-direction", &[radius_bits]);
-        let offset_m = r * (0.6 + 0.2 * salt.unit(b"zone-offset", &[radius_bits]));
+        // Drawn once from the salt alone, uniform over the disk of
+        // radius `offset_m`: every render with this salt shares the
+        // centre, whatever its radius.
+        let theta = std::f64::consts::TAU * salt.unit(b"zone-direction", &[]);
+        let dist_m = params.offset_m * salt.unit(b"zone-offset", &[]).sqrt();
         let (hlat, hlng) = (params.home_lat, params.home_lng);
         const EARTH_R: f64 = 6_371_000.0;
         let center = (
-            hlat + (offset_m * theta.cos() / EARTH_R).to_degrees(),
-            hlng + (offset_m * theta.sin() / (EARTH_R * hlat.to_radians().cos())).to_degrees(),
+            hlat + (dist_m * theta.cos() / EARTH_R).to_degrees(),
+            hlng + (dist_m * theta.sin() / (EARTH_R * hlat.to_radians().cos())).to_degrees(),
         );
-        // Measured, not nominal, offset, plus 1 m for bisection slack:
-        // every point within r of home is inside this disk.
-        let radius_m = r + haversine_m(hlat, hlng, center.0, center.1) + 1.0;
+        // Sized for the largest possible offset, not the drawn one, so
+        // the radius says nothing about where home sits inside the
+        // disk. The 1 m covers bisection slack.
         Self {
             center,
-            radius_m,
-            max_trim_m: r,
-            radius_bits,
+            radius_m: params.radius_m + params.offset_m + 1.0,
+            max_trim_m: params.radius_m,
             salt,
         }
     }
@@ -163,10 +164,9 @@ impl<'a> HiddenZone<'a> {
 
     fn trim_m(&self, activity_id: i64, crossing: u64) -> f64 {
         self.max_trim_m
-            * self.salt.unit(
-                b"crossing-trim",
-                &[self.radius_bits, activity_id as u64, crossing],
-            )
+            * self
+                .salt
+                .unit(b"crossing-trim", &[activity_id as u64, crossing])
     }
 }
 
@@ -176,11 +176,21 @@ impl<'a> HiddenZone<'a> {
 /// the track. Activities with nothing left outside the zone (or with
 /// no polyline and a start inside it) are dropped. `radius_m = 0.0`
 /// disables clipping and keeps the full decoded polyline as one
-/// segment. A positive radius without a salt is an error.
+/// segment. A positive radius without a salt is an error, and so is
+/// a radius or offset that is negative or not finite: every caller,
+/// the CLI override included, passes through here.
 pub fn apply(
     activities: impl IntoIterator<Item = Activity>,
     params: ObfuscationParams,
 ) -> Result<Vec<ObfuscatedActivity>> {
+    for (name, v) in [
+        ("obfuscation radius", params.radius_m),
+        ("[privacy].offset_m", params.offset_m),
+    ] {
+        if !v.is_finite() || v < 0.0 {
+            bail!("{name} = {v} must be a finite number >= 0");
+        }
+    }
     let zone = if params.radius_m > 0.0 {
         let salt = params.salt.as_ref().ok_or_else(|| anyhow!(MISSING_SALT))?;
         Some(HiddenZone::derive(&params, salt))
@@ -549,6 +559,7 @@ mod tests {
                 home_lng: -85.622,
                 radius_m: 250.0,
                 salt: Some(salt()),
+                offset_m: 750.0,
             },
         )
         .expect("obfuscate");
@@ -565,6 +576,7 @@ mod tests {
                 home_lng: -85.622,
                 radius_m: 0.0,
                 salt: None,
+                offset_m: 750.0,
             },
         )
         .expect("obfuscate");
@@ -670,6 +682,7 @@ mod tests {
                 home_lng: home.1,
                 radius_m: radius,
                 salt: Some(salt()),
+                offset_m: 750.0,
             },
         )
         .expect("obfuscate");
@@ -733,6 +746,7 @@ mod tests {
 
     const HOME: (f64, f64) = (42.96, -85.622);
     const EARTH_R: f64 = 6_371_000.0;
+    const RHO: f64 = 750.0;
 
     fn salt() -> PrivacySalt {
         PrivacySalt::new("test-salt-not-a-secret").expect("salt")
@@ -748,6 +762,7 @@ mod tests {
             home_lng: HOME.1,
             radius_m,
             salt: Some(salt),
+            offset_m: RHO,
         }
     }
 
@@ -876,59 +891,114 @@ mod tests {
         let (cx, cy) = (-a / 2.0, -b / 2.0);
         (cx, cy, (cx * cx + cy * cy - c).max(0.0).sqrt())
     }
-
-    /// RANSAC: the circle through three sampled points with the most
-    /// points within `tol` of it, refit by least squares on its inliers.
-    fn ransac_circle(pts: &[(f64, f64)], tol: f64) -> (f64, f64, f64) {
-        let mut rng = Lcg(0xc1c1e);
-        let mut best: Vec<(f64, f64)> = Vec::new();
-        for _ in 0..3000 {
-            let pick = |rng: &mut Lcg| pts[(rng.next() * pts.len() as f64) as usize];
-            let sample = [pick(&mut rng), pick(&mut rng), pick(&mut rng)];
-            let (cx, cy, rad) = lsq_circle(&sample);
-            if !rad.is_finite() || rad == 0.0 {
-                continue;
-            }
-            let inliers: Vec<_> = pts
-                .iter()
-                .copied()
-                .filter(|&(x, y)| ((x - cx).hypot(y - cy) - rad).abs() < tol)
-                .collect();
-            if inliers.len() > best.len() {
-                best = inliers;
-            }
-        }
-        lsq_circle(&best)
+    /// Kasa fit over the cut endpoints of one render: (centre, radius)
+    /// in local metres around home.
+    fn fit_render(r: f64, salt: PrivacySalt) -> ((f64, f64), f64) {
+        let kept = apply(radiating(120, r), params(r, salt)).expect("obfuscate");
+        let pts = cut_endpoints(&kept);
+        assert!(pts.len() >= 120, "too few cut endpoints: {}", pts.len());
+        let (cx, cy, rad) = lsq_circle(&pts);
+        ((cx, cy), rad)
     }
 
     #[test]
-    fn blind_circle_fit_does_not_find_home() {
-        // I2. The attacker gets the cut endpoints alone (an oracle the
-        // real attacker lacks) and fits a circle two ways. Neither
-        // centre may land within 0.5r of home, and neither radius may
-        // land near r. Against the exact home-circle clip both fits
-        // return home and r to within a metre.
+    fn circle_fit_misses_home_across_salts() {
+        // I2, statistically. Across 64 salts the fitted centre must sit
+        // well away from home on average: a uniform draw over the
+        // offset disk gives about 0.67 rho, the exact home-circle clip
+        // gives 0. No fitted radius may land near r.
         let r = 250.0;
-        let acts = radiating(240, r);
-        for i in 0..8 {
-            let kept = apply(acts.clone(), params(r, salt_n(i))).expect("obfuscate");
-            let pts = cut_endpoints(&kept);
-            assert!(pts.len() >= 240, "too few cut endpoints: {}", pts.len());
-            for (name, (cx, cy, rad)) in [
-                ("least squares", lsq_circle(&pts)),
-                ("ransac", ransac_circle(&pts, 0.02 * r)),
-            ] {
-                let miss = cx.hypot(cy);
+        let mut total = 0.0;
+        for i in 0..64 {
+            let (c, rad) = fit_render(r, salt_n(i));
+            total += c.0.hypot(c.1);
+            assert!(
+                (rad - r).abs() > 0.25 * r,
+                "salt {i}: fit radius {rad:.1} m reveals r"
+            );
+        }
+        let mean = total / 64.0;
+        assert!(mean >= 0.4 * RHO, "mean fit miss {mean:.1} m < 0.4 rho");
+    }
+
+    #[test]
+    fn offset_direction_spreads_across_salts() {
+        // A fixed direction would let one render's fit point at home
+        // for every user. Mean resultant length of the fitted-centre
+        // bearings: about 0.1 for uniform bearings, 1 for a constant.
+        let (mut sx, mut sy) = (0.0, 0.0);
+        for i in 0..64 {
+            let (c, _) = fit_render(250.0, salt_n(i));
+            let d = c.0.hypot(c.1);
+            sx += c.0 / d;
+            sy += c.1 / d;
+        }
+        let resultant = sx.hypot(sy) / 64.0;
+        assert!(
+            resultant < 0.3,
+            "bearings cluster: resultant {resultant:.2}"
+        );
+    }
+
+    #[test]
+    fn renders_at_two_radii_share_the_centre() {
+        // Renders with one salt at r = 250 and r = 1000 must not offer
+        // two different centres to intersect, and neither zone may
+        // touch the home disk (no tangency puts home on a known ring).
+        for i in 0..64 {
+            let s = salt_n(i);
+            let z1 = HiddenZone::derive(&params(250.0, s.clone()), &s);
+            let z2 = HiddenZone::derive(&params(1000.0, s.clone()), &s);
+            assert_eq!(z1.center, z2.center, "salt {i}: centre moved with r");
+            for (z, r) in [(&z1, 250.0), (&z2, 1000.0)] {
+                let off = haversine_m(HOME.0, HOME.1, z.center.0, z.center.1);
+                assert!(off <= RHO + 0.01, "salt {i}: offset {off:.2} > rho");
                 assert!(
-                    miss >= 0.5 * r,
-                    "salt {i}: {name} fit centre is {miss:.1} m from home (r = {r})"
-                );
-                assert!(
-                    (rad - r).abs() > 0.25 * r,
-                    "salt {i}: {name} fit radius {rad:.1} m reveals r = {r}"
+                    z.radius_m - (off + r) >= 1.0 - 1e-6,
+                    "salt {i}, r {r}: zone touches the home disk"
                 );
             }
         }
+    }
+
+    #[test]
+    fn cut_ends_do_not_trace_a_circle() {
+        // Without trims every cut end sits on the zone's edge. No 5 m
+        // band around the zone centre may hold more than 15% of them.
+        let r = 250.0;
+        for i in 0..8 {
+            let s = salt_n(i);
+            let z = HiddenZone::derive(&params(r, s.clone()), &s);
+            let kept = apply(radiating(240, r), params(r, s.clone())).expect("obfuscate");
+            let c = to_local(z.center);
+            let mut d: Vec<f64> = cut_endpoints(&kept)
+                .iter()
+                .map(|p| (p.0 - c.0).hypot(p.1 - c.1))
+                .collect();
+            d.sort_by(f64::total_cmp);
+            let mut densest = 0;
+            for (j, &lo) in d.iter().enumerate() {
+                densest = densest.max(d[j..].partition_point(|&x| x < lo + 0.02 * r));
+            }
+            let frac = densest as f64 / d.len() as f64;
+            assert!(
+                frac < 0.15,
+                "salt {i}: {:.0}% of cut ends on one ring",
+                frac * 100.0
+            );
+        }
+    }
+
+    #[test]
+    fn trims_vary_per_activity() {
+        // The trim is seeded per activity: one shared trim per crossing
+        // index would line the cut ends up again.
+        let s = salt();
+        let z = HiddenZone::derive(&params(250.0, s.clone()), &s);
+        let t: Vec<f64> = (1..=200).map(|id| z.trim_m(id, 0)).collect();
+        let mean = t.iter().sum::<f64>() / t.len() as f64;
+        let sd = (t.iter().map(|x| (x - mean).powi(2)).sum::<f64>() / t.len() as f64).sqrt();
+        assert!(sd > 0.2 * 250.0, "trim spread {sd:.1} m across activities");
     }
 
     #[test]
@@ -958,8 +1028,6 @@ mod tests {
             for i in 0..32 {
                 let s = salt_n(i);
                 let z = HiddenZone::derive(&params(r, s.clone()), &s);
-                let off = haversine_m(HOME.0, HOME.1, z.center.0, z.center.1);
-                assert!((0.6 * r - 0.01..=0.8 * r + 0.01).contains(&off));
                 for k in 0..360 {
                     let a = (k as f64).to_radians();
                     let (lat, lng) = to_latlng(r * a.cos(), r * a.sin());
@@ -988,7 +1056,7 @@ mod tests {
         assert_eq!(run(salt()), run(salt()));
         assert_ne!(run(salt()), run(salt_n(1)));
 
-        let pts: Vec<(f64, f64)> = (0..=20).map(|i| to_latlng(50.0 * i as f64, 0.0)).collect();
+        let pts: Vec<(f64, f64)> = (0..=80).map(|i| to_latlng(50.0 * i as f64, 0.0)).collect();
         let twins = vec![activity_from(1, &pts), activity_from(2, &pts)];
         let kept = apply(twins, params(r, salt())).expect("obfuscate");
         assert_eq!(kept.len(), 2);

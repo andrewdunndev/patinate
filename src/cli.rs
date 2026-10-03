@@ -441,9 +441,6 @@ fn render_cmd(args: RenderArgs) -> Result<()> {
         "activities loaded after filters"
     );
 
-    let obfuscation_radius_m = args
-        .obfuscation_radius_m
-        .unwrap_or(cfg.obfuscation_radius_m);
     if let Some(override_r) = args.obfuscation_radius_m {
         tracing::info!(
             cfg_radius_m = cfg.obfuscation_radius_m,
@@ -453,12 +450,7 @@ fn render_cmd(args: RenderArgs) -> Result<()> {
     }
     let obfuscated = obfuscation::apply(
         activities,
-        ObfuscationParams {
-            home_lat: cfg.home_lat,
-            home_lng: cfg.home_lng,
-            radius_m: obfuscation_radius_m,
-            salt: cfg.privacy_salt.clone(),
-        },
+        obfuscation_params(&cfg, args.obfuscation_radius_m),
     )?;
     tracing::info!(kept = obfuscated.len(), "after obfuscation");
 
@@ -485,6 +477,19 @@ fn render_cmd(args: RenderArgs) -> Result<()> {
     tracing::info!(out = %args.out.display(), bytes = svg.len(), "wrote SVG");
 
     Ok(())
+}
+
+/// Privacy params for a render: config values, with the CLI radius
+/// override applied. `obfuscation::apply()` validates the result, so an
+/// override can't skip the clip or the salt check.
+fn obfuscation_params(cfg: &ValidatedConfig, override_r: Option<f64>) -> ObfuscationParams {
+    ObfuscationParams {
+        home_lat: cfg.home_lat,
+        home_lng: cfg.home_lng,
+        radius_m: override_r.unwrap_or(cfg.obfuscation_radius_m),
+        salt: cfg.privacy_salt.clone(),
+        offset_m: cfg.privacy_offset_m,
+    }
 }
 
 fn load_activities_json(path: &std::path::Path) -> Result<Vec<Activity>> {
@@ -1019,4 +1024,60 @@ fn list_themes_cmd(args: ListThemesArgs) -> Result<()> {
         }
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn render_args(radius: &str) -> RenderArgs {
+        let flag = format!("--obfuscation-radius-m={radius}");
+        match Cli::try_parse_from(["patinate", "render", flag.as_str()])
+            .expect("args parse")
+            .command
+        {
+            Command::Render(args) => args,
+            _ => unreachable!(),
+        }
+    }
+
+    #[test]
+    fn bad_radius_override_is_rejected_not_unclipped() {
+        // `inf` once turned into a NaN zone radius and every ride
+        // rendered unclipped; NaN and negatives skipped the clip and
+        // the salt check. apply() must refuse all three.
+        let cfg = config::load("fixtures/config.toml").expect("config loads");
+        let mut ride = crate::strava::Activity {
+            id: 1,
+            name: "t".into(),
+            activity_type: strava::ActivityType::Ride,
+            start_date: chrono::Utc::now(),
+            start_lat: cfg.home_lat,
+            start_lng: cfg.home_lng,
+            distance_m: 0.0,
+            moving_time_s: 0,
+            summary_polyline: String::new(),
+            athlete_id: 1,
+            gear_id: None,
+        };
+        ride.summary_polyline = polyline::encode_coordinates(
+            [(0.0, 0.0), (0.0, 0.05)].map(|(n, e)| geo_types::Coord {
+                x: cfg.home_lng + e,
+                y: cfg.home_lat + n,
+            }),
+            5,
+        )
+        .expect("encode");
+        for bad in ["inf", "NaN", "-5"] {
+            let params = obfuscation_params(&cfg, render_args(bad).obfuscation_radius_m);
+            let err = obfuscation::apply(vec![ride.clone()], params).unwrap_err();
+            assert!(
+                err.to_string().contains("finite number >= 0"),
+                "{bad}: {err}"
+            );
+        }
+        let ok = obfuscation_params(&cfg, render_args("250").obfuscation_radius_m);
+        assert_eq!(ok.radius_m, 250.0);
+        assert!(obfuscation::apply(vec![ride], ok).is_ok());
+    }
 }

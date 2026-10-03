@@ -7,6 +7,7 @@
 use anyhow::{Context, Result, bail};
 use figment::Figment;
 use figment::providers::{Env, Format, Toml};
+use figment::value::Value;
 use serde::Deserialize;
 use std::path::{Path, PathBuf};
 
@@ -42,8 +43,12 @@ struct Privacy {
     home_lat: f64,
     home_lng: f64,
     obfuscation_radius_m: f64,
+    /// Untyped so a mistyped salt (a bare number, say) fails in
+    /// `validate` without figment echoing its value.
     #[serde(default)]
-    salt: Option<String>,
+    salt: Option<Value>,
+    #[serde(default = "default_offset_m")]
+    offset_m: f64,
 }
 
 #[derive(Debug, Default, Deserialize)]
@@ -75,6 +80,8 @@ pub struct ValidatedConfig {
     /// Seeds the hidden zone; required by `obfuscation::apply()` when
     /// the radius is positive. Debug output is redacted.
     pub privacy_salt: Option<PrivacySalt>,
+    /// Bound on the secret offset of the hidden zone from home, metres.
+    pub privacy_offset_m: f64,
     pub strava_client_id: Option<String>,
     pub strava_client_secret: Option<String>,
     pub strava_refresh_token: Option<String>,
@@ -171,6 +178,15 @@ fn require_finite(name: &str, v: f64) -> Result<()> {
     );
 }
 
+/// The salt shipped in fixtures/config.toml. Public, so it is only
+/// accepted with the fixture's own home.
+const FIXTURE_SALT: &str = "public-fixture-salt-not-a-secret";
+const FIXTURE_HOME: (f64, f64) = (42.9618, -85.6217);
+
+fn default_offset_m() -> f64 {
+    750.0
+}
+
 fn validate(raw: RawConfig) -> Result<ValidatedConfig> {
     require_finite("[general].center_lat", raw.general.center_lat)?;
     require_finite("[general].center_lng", raw.general.center_lng)?;
@@ -229,12 +245,37 @@ fn validate(raw: RawConfig) -> Result<ValidatedConfig> {
              Try 1200 x 1600 for a 3:4 poster aspect."
         );
     }
-    let privacy_salt = raw
-        .privacy
-        .salt
-        .as_deref()
-        .map(PrivacySalt::new)
-        .transpose()?;
+    require_finite("[privacy].offset_m", raw.privacy.offset_m)?;
+    if raw.privacy.offset_m < 0.0 {
+        bail!(
+            "[privacy].offset_m = {} must be >= 0. Leave it out for the \
+             default of {} m.",
+            raw.privacy.offset_m,
+            default_offset_m()
+        );
+    }
+    let privacy_salt = match &raw.privacy.salt {
+        None => None,
+        Some(Value::String(_, s)) => {
+            if s.trim() == FIXTURE_SALT
+                && (raw.privacy.home_lat, raw.privacy.home_lng) != FIXTURE_HOME
+            {
+                bail!(
+                    "[privacy].salt is the public salt from fixtures/config.toml, \
+                     but home is not the fixture's. A published salt hides \
+                     nothing. Set your own in ~/.config/patinate/config.toml: \
+                     salt = \"<output of: openssl rand -hex 16>\""
+                );
+            }
+            Some(PrivacySalt::new(s)?)
+        }
+        // Never echo the value: it is meant to be a secret.
+        Some(_) => bail!(
+            "[privacy].salt must be a string. Quote it in TOML \
+             (salt = \"...\"); in PATINATE_PRIVACY__SALT, wrap the value in \
+             double quotes."
+        ),
+    };
     Ok(ValidatedConfig {
         city_name: raw.general.city_name,
         country: raw.general.country,
@@ -248,6 +289,7 @@ fn validate(raw: RawConfig) -> Result<ValidatedConfig> {
         home_lng: raw.privacy.home_lng,
         obfuscation_radius_m: raw.privacy.obfuscation_radius_m,
         privacy_salt,
+        privacy_offset_m: raw.privacy.offset_m,
         strava_client_id: raw.strava.client_id,
         strava_client_secret: raw.strava.client_secret,
         strava_refresh_token: raw.strava.refresh_token,
@@ -278,6 +320,7 @@ mod tests {
                 home_lng,
                 obfuscation_radius_m: radius,
                 salt: None,
+                offset_m: 750.0,
             },
             strava: Strava::default(),
         }
@@ -305,5 +348,84 @@ mod tests {
     fn infinity_home_lng_rejected() {
         let err = validate(raw(42.0, f64::INFINITY, 250.0)).unwrap_err();
         assert!(err.to_string().contains("not a finite number"));
+    }
+
+    /// Synthetic config text; `privacy` is spliced in per test.
+    fn from_toml(privacy: &str) -> Result<ValidatedConfig> {
+        let text = format!(
+            "[general]\ncity_name = \"T\"\ncountry = \"T\"\ncenter_lat = 0.0\n\
+             center_lng = 0.0\nradius_m = 1000.0\n\
+             [render]\ntheme = \"noir_heat\"\nviewbox_width = 1\nviewbox_height = 1\n\
+             [privacy]\nobfuscation_radius_m = 250.0\n{privacy}\n"
+        );
+        validate(Figment::from(Toml::string(&text)).extract()?)
+    }
+
+    const SYNTH_HOME: &str = "home_lat = 10.123456\nhome_lng = 20.654321";
+
+    #[test]
+    fn offset_defaults_and_rejects_bad_values() {
+        let cfg = from_toml(SYNTH_HOME).unwrap();
+        assert_eq!(cfg.privacy_offset_m, 750.0);
+        for bad in ["-1.0", "nan", "inf"] {
+            let err = from_toml(&format!("{SYNTH_HOME}\noffset_m = {bad}")).unwrap_err();
+            assert!(err.to_string().contains("[privacy].offset_m"), "{err}");
+        }
+    }
+
+    #[test]
+    fn fixture_salt_only_with_fixture_home() {
+        // I5: the public fixture salt can't silently seed a real home.
+        let salt = format!("salt = \"{FIXTURE_SALT}\"");
+        let err = from_toml(&format!("{SYNTH_HOME}\n{salt}")).unwrap_err();
+        let msg = format!("{err:#}");
+        assert!(msg.contains("public salt"), "{msg}");
+        assert!(
+            !msg.contains("10.12") && !msg.contains("20.65"),
+            "home echoed"
+        );
+        let fixture_home = format!(
+            "home_lat = {}\nhome_lng = {}\n{salt}",
+            FIXTURE_HOME.0, FIXTURE_HOME.1
+        );
+        assert!(from_toml(&fixture_home).unwrap().privacy_salt.is_some());
+    }
+
+    #[test]
+    fn non_string_salt_from_toml_is_not_echoed() {
+        // I4: a bare number is not a string; the error must not carry it.
+        let err = from_toml(&format!("{SYNTH_HOME}\nsalt = 98765432109876543")).unwrap_err();
+        let msg = format!("{err:#}");
+        assert!(msg.contains("must be a string"), "{msg}");
+        assert!(!msg.contains("98765432109876543"), "salt echoed");
+    }
+
+    #[test]
+    fn non_string_salt_from_env_is_not_echoed() {
+        // The Env provider parses each value with `Value::from_str`;
+        // merge one parsed the same way rather than mutate process env.
+        let text = format!(
+            "[general]\ncity_name = \"T\"\ncountry = \"T\"\ncenter_lat = 0.0\n\
+             center_lng = 0.0\nradius_m = 1000.0\n\
+             [render]\ntheme = \"noir_heat\"\nviewbox_width = 1\nviewbox_height = 1\n\
+             [privacy]\nobfuscation_radius_m = 250.0\n{SYNTH_HOME}\n"
+        );
+        let from_env = |v: &str| {
+            let parsed: Value = v.parse().expect("infallible");
+            let fig = Figment::from(Toml::string(&text)).merge(
+                figment::providers::Serialized::default("privacy.salt", parsed),
+            );
+            validate(fig.extract().expect("extract"))
+        };
+        let msg = format!("{:#}", from_env("98765432109876543").unwrap_err());
+        assert!(msg.contains("must be a string"), "{msg}");
+        assert!(!msg.contains("98765432109876543"), "salt echoed");
+        // The quoting advice in that message works.
+        assert!(
+            from_env("\"98765432109876543\"")
+                .unwrap()
+                .privacy_salt
+                .is_some()
+        );
     }
 }
