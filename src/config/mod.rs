@@ -182,7 +182,7 @@ fn require_finite(name: &str, v: f64) -> Result<()> {
 /// The salt shipped in fixtures/config.toml. Public, so it is only
 /// accepted with the fixture's own home.
 const FIXTURE_SALT: &str = "public-fixture-salt-not-a-secret";
-const FIXTURE_HOME: (f64, f64) = (42.9618, -85.6217);
+const FIXTURE_HOME: (f64, f64) = (42.9633, -85.7039);
 
 fn default_offset_m() -> f64 {
     750.0

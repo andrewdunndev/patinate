@@ -13,14 +13,14 @@ viewbox_width = 1200
 viewbox_height = 1600
 
 [privacy]
-# Aquinas College, Grand Rapids -- a public university campus (NOT a
+# John Ball Park, Grand Rapids -- a public park and zoo (NOT a
 # residential address), used as a clearly non-identifying example
 # home center for fixture renders. Replace with your own home_lat /
 # home_lng in your real config (kept private at
 # ~/.config/patinate/config.toml), with your own secret salt there too.
 # This salt is public, so it hides nothing; never copy it.
-home_lat = 42.9618
-home_lng = -85.6217
+home_lat = 42.9633
+home_lng = -85.7039
 obfuscation_radius_m = 250
 salt = "public-fixture-salt-not-a-secret"
 
