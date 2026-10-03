@@ -13,6 +13,7 @@ license = "MIT"
 keywords = ["strava", "heatmap", "cycling", "osm", "poster"]
 categories = ["command-line-utilities", "visualization"]
 publish = true
+include = ["/src/**", "/themes/**", "/README.md", "/LICENSE", "/CHANGELOG.md"]
 
 [[bin]]
 name = "patinate"
