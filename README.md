@@ -69,11 +69,12 @@ Token" is `read`-only and will not work for sync.
 
 ## Privacy
 
-Nothing within `obfuscation_radius_m` of home reaches the SVG, and
-the cut doesn't outline home: the hidden disk is larger, offset from
-home by a vector seeded from `[privacy].salt`, and each cut end is
-trimmed a further seeded distance. Render refuses a positive radius
-without a salt; set one privately (`openssl rand -hex 16`) and keep it.
+Nothing within `obfuscation_radius_m` of home reaches the SVG. The
+hidden zone is offset from home by a secret amount (up to `offset_m`,
+default 750 m, seeded by `[privacy].salt`) and its edges are trimmed.
+Tracks still converge toward home, so a determined analyst can narrow
+it to some hundreds of metres; choose a larger radius for more cover.
+A radius needs a private, stable salt (`openssl rand -hex 16`).
 
 Default-rendered SVGs embed `data-rider`, `data-bike`, `data-year`,
 `data-type` on heat paths plus exact center coords in `<desc>`.
@@ -85,8 +86,7 @@ Useful for consumer-page filters; identifying in a public publication.
 patinate render --theme cycle_heat --anonymize --obfuscation-radius-m 1000 --out heatmap.svg
 ```
 
-`--anonymize` drops the `data-*` attrs and `<desc>`. Rasterizing
-hides nothing more; the protection is in the geometry.
+`--anonymize` drops the `data-*` attrs and `<desc>`; a PNG hides no more.
 
 ## Subcommands
 
