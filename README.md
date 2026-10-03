@@ -85,6 +85,8 @@ patinate render --theme cycle_heat --anonymize --obfuscation-radius-m 1000 --out
 ```
 
 `--anonymize` drops the `data-*` attrs and `<desc>`; a PNG hides no more.
+It also warns when `[general]` center sits within the radius plus
+`offset_m` of home, since the frame centers on it.
 
 ## Subcommands
 
@@ -99,7 +101,9 @@ patinate render --theme cycle_heat --anonymize --obfuscation-radius-m 1000 --out
 ## Themes
 
 Four themes baked into the binary. `--themes-dir <dir>` adds custom
-`*.json` themes alongside.
+`*.json` themes alongside. The heat core multiplies on a light `bg`
+and screens on a dark one; `heat.blend` (`normal`, `multiply`,
+`screen`) pins it.
 
 | Preview | Theme | Palette | Use when |
 |---|---|---|---|
@@ -129,6 +133,7 @@ Four themes baked into the binary. `--themes-dir <dir>` adds custom
 | `--heat-alpha <f>` | Multiplier on sharp-core stroke opacity. |
 | `--radius-m <m>` | Override the configured map radius. |
 | `--viewbox-width <px>` / `--viewbox-height <px>` | Override viewBox dimensions. |
+| `--fit <contain\|cover>` | `contain` (default) letterboxes the radius circle; `cover` fills the viewBox and crops. The frame never depends on rides or home. |
 | `--no-refine` | Skip OSM filter pipeline. Diagnostic. |
 | `--config <path>` | TOML config. Default `~/.config/patinate/config.toml`. |
 | `--osm <path>` | Pre-fetched OSM JSON. Default per-user cache. |
@@ -147,7 +152,7 @@ preset skips it).
 
 ```bash
 patinate render --theme cycle_heat --cycling --web --transparent-bg \
-  --radius-m 12000 --viewbox-width 1200 --viewbox-height 720 \
+  --radius-m 12000 --viewbox-width 1200 --viewbox-height 720 --fit cover \
   --out hero.svg
 
 rsvg-convert hero.svg -w 3600 -h 2160 -o /tmp/hero.png
