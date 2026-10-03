@@ -71,9 +71,9 @@ Token" is `read`-only and will not work for sync.
 
 Nothing within `obfuscation_radius_m` of home reaches the SVG. The
 hidden zone is offset from home by a secret amount (up to `offset_m`,
-default 750 m, seeded by `[privacy].salt`) and its edges are trimmed.
-Tracks still converge toward home, so a determined analyst can narrow
-it to some hundreds of metres; choose a larger radius for more cover.
+default 750 m, floor 250, seeded by `[privacy].salt`), edges trimmed.
+Tracks still converge toward home: a determined analyst can narrow it
+to roughly 100-250 m. A larger radius adds only modest cover.
 A radius needs a private, stable salt (`openssl rand -hex 16`).
 
 Default-rendered SVGs embed `data-rider`, `data-bike`, `data-year`,
