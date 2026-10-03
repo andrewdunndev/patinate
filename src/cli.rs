@@ -23,6 +23,7 @@ use crate::cache::{self, queries::StoredTokens};
 use crate::config::{self, ValidatedConfig};
 use crate::obfuscation::{self, ObfuscationParams};
 use crate::osm;
+use crate::render::projection::Fit;
 use crate::render::{compose, theme};
 use crate::strava::{self, Activity, auth::AuthClient, client::StravaClient};
 
@@ -96,11 +97,11 @@ struct FetchOsmArgs {
     city: Option<String>,
 
     /// Center latitude in decimal degrees. Pair with --center-lng.
-    #[arg(long)]
+    #[arg(long, allow_negative_numbers = true)]
     center_lat: Option<f64>,
 
     /// Center longitude in decimal degrees. Pair with --center-lat.
-    #[arg(long)]
+    #[arg(long, allow_negative_numbers = true)]
     center_lng: Option<f64>,
 
     /// Search radius in meters around the center point. 25000 is a
@@ -194,9 +195,9 @@ struct RenderArgs {
     heat_only: bool,
 
     /// Web-embed preset: strip detail for inline-on-page use. Drops
-    /// tertiary + residential roads, drops typography (consumer page
-    /// adds its own), uses single-layer heat (no glow stack), coord
-    /// precision 1. Targets ~500KB SVG.
+    /// tertiary + residential roads and streams, drops typography
+    /// (consumer page adds its own), lightens the heat glow, and writes
+    /// compact paths sized to the viewbox (see `render::path`).
     #[arg(long)]
     web: bool,
 
@@ -207,6 +208,13 @@ struct RenderArgs {
     /// Override viewbox height.
     #[arg(long)]
     viewbox_height: Option<u32>,
+
+    /// How the radius circle meets a viewbox of another aspect:
+    /// `contain` letterboxes so the whole circle shows, `cover` fills
+    /// the viewbox and crops the long axis. The frame comes from the
+    /// config's center and radius only, never from the rides.
+    #[arg(long, value_enum, default_value_t = Fit::Contain)]
+    fit: Fit,
 
     /// Render only this single Strava activity ID (single-ride poster).
     #[arg(long)]
@@ -362,6 +370,7 @@ fn render_cmd(args: RenderArgs) -> Result<()> {
         roads = basemap.roads.len(),
         water_polygons = basemap.water_polygons.len(),
         water_lines = basemap.water_lines.len(),
+        streams = basemap.streams.len(),
         parks = basemap.parks.len(),
         "OSM basemap loaded (raw)"
     );
@@ -448,14 +457,20 @@ fn render_cmd(args: RenderArgs) -> Result<()> {
             "obfuscation radius overridden via --obfuscation-radius-m"
         );
     }
-    let obfuscated = obfuscation::apply(
-        activities,
-        obfuscation_params(&cfg, args.obfuscation_radius_m),
-    )?;
+    let privacy = obfuscation_params(&cfg, args.obfuscation_radius_m);
+    if args.anonymize && obfuscation::center_near_home(&privacy, cfg.center_lat, cfg.center_lng) {
+        // Never name either point: the warning may land in a CI log.
+        tracing::warn!(
+            "the map center lies within the obfuscation radius plus the \
+             privacy offset of home, so a published frame centers near \
+             home; move [general] center elsewhere before publishing"
+        );
+    }
+    let obfuscated = obfuscation::apply(activities, privacy)?;
     tracing::info!(kept = obfuscated.len(), "after obfuscation");
 
-    // `--web` semantics (single-layer heat, precision-1 coords, dropped
-    // minor road tiers, no own typography) all live inside compose::render.
+    // `--web` semantics (lighter glow, compact paths, dropped
+    // minor road tiers and streams, no own typography) all live inside compose::render.
     // The CLI just passes the flag through.
     let svg = compose::render(
         &cfg,
@@ -465,6 +480,7 @@ fn render_cmd(args: RenderArgs) -> Result<()> {
         args.heat_only,
         args.web,
         args.transparent_bg,
+        args.fit,
         compose::HeatTuning {
             bloom: args.heat_bloom,
             alpha: args.heat_alpha,
@@ -1037,6 +1053,26 @@ mod tests {
             .command
         {
             Command::Render(args) => args,
+            _ => unreachable!(),
+        }
+    }
+
+    #[test]
+    fn fetch_osm_accepts_negative_coordinates() {
+        let cli = Cli::try_parse_from([
+            "patinate",
+            "fetch-osm",
+            "--center-lat",
+            "-33.87",
+            "--center-lng",
+            "-85.66",
+        ])
+        .expect("negative coords parse");
+        match cli.command {
+            Command::FetchOsm(a) => {
+                assert_eq!(a.center_lat, Some(-33.87));
+                assert_eq!(a.center_lng, Some(-85.66));
+            }
             _ => unreachable!(),
         }
     }

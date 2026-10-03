@@ -14,6 +14,16 @@ use crate::osm::LatLon;
 /// emit infinities.
 const MAX_ABS_LAT_DEGREES: f64 = 85.0;
 
+/// How the radius circle's bounding box meets a viewbox of another
+/// aspect. `Contain` letterboxes the short axis so the whole circle
+/// shows; `Cover` fills the viewbox and crops the long axis.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, clap::ValueEnum)]
+pub enum Fit {
+    #[default]
+    Contain,
+    Cover,
+}
+
 pub struct Projection {
     /// Mercator-projected min x, min y of the bbox we render.
     min_mx: f64,
@@ -33,8 +43,12 @@ pub struct Projection {
 impl Projection {
     /// Build a projection that fits a circle of radius `radius_m`
     /// centered on `(center_lat, center_lng)` into a viewBox of
-    /// `viewbox_w x viewbox_h` SVG units. Aspect is preserved by
-    /// letterboxing the shorter axis.
+    /// `viewbox_w x viewbox_h` SVG units. Aspect is preserved; `fit`
+    /// picks letterboxing (`Contain`) or cropping (`Cover`).
+    ///
+    /// The frame depends on these public inputs alone, never on
+    /// activity geometry or home: rides cluster around home, so a frame
+    /// fitted to them would point at it.
     ///
     /// **Known limitation: antimeridian crossing is not handled.**
     /// Centers within `radius_m / (111_320 * cos(lat))` degrees of
@@ -49,6 +63,7 @@ impl Projection {
         radius_m: f64,
         viewbox_w: u32,
         viewbox_h: u32,
+        fit: Fit,
     ) -> Result<Self> {
         if center_lat.abs() >= MAX_ABS_LAT_DEGREES {
             bail!(
@@ -78,10 +93,14 @@ impl Projection {
 
         let scale_x = viewbox_w as f64 / bbox_w;
         let scale_y = viewbox_h as f64 / bbox_h;
-        let scale = scale_x.min(scale_y);
+        let scale = match fit {
+            Fit::Contain => scale_x.min(scale_y),
+            Fit::Cover => scale_x.max(scale_y),
+        };
 
         let used_w = bbox_w * scale;
         let used_h = bbox_h * scale;
+        // Negative under `Cover`: the bbox overflows and is cropped.
         let pad_x = (viewbox_w as f64 - used_w) / 2.0;
         let pad_y = (viewbox_h as f64 - used_h) / 2.0;
 
@@ -133,4 +152,48 @@ fn mercator(lat: f64, lng: f64) -> (f64, f64) {
     let x = lng.to_radians();
     let y = ((std::f64::consts::PI / 4.0 + lat.to_radians() / 2.0).tan()).ln();
     (x, y)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const LAT: f64 = 42.96;
+    const LNG: f64 = -85.67;
+    const R: f64 = 25_000.0;
+
+    /// Projected extent of the radius circle's bounding box.
+    fn bbox_extent(p: &Projection) -> (f64, f64, f64, f64) {
+        let dlat = R / 111_320.0;
+        let dlng = R / (111_320.0 * LAT.to_radians().cos());
+        let (x0, y0) = p.project(LAT + dlat, LNG - dlng);
+        let (x1, y1) = p.project(LAT - dlat, LNG + dlng);
+        (x0, y0, x1, y1)
+    }
+
+    #[test]
+    fn cover_fills_the_viewbox() {
+        for (w, h) in [(1600, 900), (1200, 1600), (900, 900)] {
+            let p = Projection::fit_radius(LAT, LNG, R, w, h, Fit::Cover).unwrap();
+            let (x0, y0, x1, y1) = bbox_extent(&p);
+            let (w, h) = (w as f64, h as f64);
+            assert!(x0 <= 1e-6 && x1 >= w - 1e-6, "{w}x{h}: x {x0}..{x1}");
+            assert!(y0 <= 1e-6 && y1 >= h - 1e-6, "{w}x{h}: y {y0}..{y1}");
+            // One axis meets the edges exactly; the other overflows.
+            let tight_x = x0.abs() < 1e-6 && (x1 - w).abs() < 1e-6;
+            let tight_y = y0.abs() < 1e-6 && (y1 - h).abs() < 1e-6;
+            assert!(tight_x || tight_y, "{w}x{h}: no axis fits exactly");
+            let (cx, cy) = p.project(LAT, LNG);
+            // Mercator stretches y, so the center sits a hair off middle.
+            assert!((cx - w / 2.0).abs() < 1e-6 && (cy - h / 2.0).abs() < 0.003 * w.max(h));
+        }
+    }
+
+    #[test]
+    fn contain_letterboxes_inside_the_viewbox() {
+        let p = Projection::fit_radius(LAT, LNG, R, 1600, 900, Fit::Contain).unwrap();
+        let (x0, y0, x1, y1) = bbox_extent(&p);
+        assert!(x0 > 1.0 && x1 < 1599.0, "wide viewbox letterboxes x");
+        assert!(y0.abs() < 1e-6 && (y1 - 900.0).abs() < 1e-6);
+    }
 }

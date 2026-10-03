@@ -74,6 +74,30 @@ pub struct HeatStyle {
     /// Inner glow stroke-opacity.
     #[serde(default = "default_glow_inner_alpha")]
     pub glow_inner_alpha: f32,
+    /// Blend mode for the sharp core. Omitted: derived from `bg` via
+    /// `Theme::heat_blend` (multiply on light grounds, screen on dark).
+    #[serde(default)]
+    pub blend: Option<HeatBlend>,
+}
+
+/// `mix-blend-mode` for the heat core. Multiply presses ink into paper
+/// but crushes heat to black on a dark ground; screen is its mirror.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum HeatBlend {
+    Normal,
+    Multiply,
+    Screen,
+}
+
+impl HeatBlend {
+    pub fn as_css(self) -> &'static str {
+        match self {
+            HeatBlend::Normal => "normal",
+            HeatBlend::Multiply => "multiply",
+            HeatBlend::Screen => "screen",
+        }
+    }
 }
 
 fn default_glow_outer_ratio() -> f32 {
@@ -105,6 +129,24 @@ impl HexColor {
     pub fn as_str(&self) -> &str {
         &self.0
     }
+
+    /// WCAG relative luminance, 0 (black) to 1 (white).
+    pub fn relative_luminance(&self) -> f64 {
+        let channel = |i: usize| {
+            let c = u8::from_str_radix(&self.0[i..i + 2], 16).unwrap_or(0) as f64 / 255.0;
+            if c <= 0.04045 {
+                c / 12.92
+            } else {
+                ((c + 0.055) / 1.055).powf(2.4)
+            }
+        };
+        0.2126 * channel(1) + 0.7152 * channel(3) + 0.0722 * channel(5)
+    }
+
+    /// Lighter than mid grey (L* 50, relative luminance about 0.18).
+    pub fn is_light(&self) -> bool {
+        self.relative_luminance() > 0.18
+    }
 }
 
 impl<'de> Deserialize<'de> for HexColor {
@@ -132,6 +174,16 @@ fn is_valid_hex6(s: &str) -> bool {
 }
 
 impl Theme {
+    /// The heat core's blend: the theme's `heat.blend`, else multiply
+    /// on a light `bg` and screen on a dark one.
+    pub fn heat_blend(&self) -> HeatBlend {
+        self.heat.blend.unwrap_or(if self.bg.is_light() {
+            HeatBlend::Multiply
+        } else {
+            HeatBlend::Screen
+        })
+    }
+
     pub fn road_style(&self, tier: RoadTier) -> &RoadStyle {
         match tier {
             RoadTier::Motorway => &self.road_motorway,
@@ -239,5 +291,27 @@ mod tests {
         let bp = load("themes/blueprint_heat.json").expect("blueprint_heat loads");
         assert_eq!(noir.name, "noir_heat");
         assert_eq!(bp.name, "blueprint_heat");
+    }
+
+    #[test]
+    fn blend_defaults_from_bg_luminance() {
+        for (name, want) in [
+            ("noir_heat", HeatBlend::Screen),
+            ("blueprint_heat", HeatBlend::Screen),
+            ("warm_beige", HeatBlend::Multiply),
+            ("cycle_heat", HeatBlend::Multiply),
+        ] {
+            let t = load_named(name, None).expect("embedded theme loads");
+            assert_eq!(t.heat.blend, None, "{name} ships without a blend");
+            assert_eq!(t.heat_blend(), want, "{name}");
+        }
+    }
+
+    #[test]
+    fn blend_field_overrides_the_default() {
+        let mut t = load_named("noir_heat", None).expect("embedded theme loads");
+        t.heat.blend = serde_json::from_str("\"normal\"").expect("parses");
+        assert_eq!(t.heat_blend(), HeatBlend::Normal);
+        assert!(serde_json::from_str::<HeatBlend>("\"overlay\"").is_err());
     }
 }

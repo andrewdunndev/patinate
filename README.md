@@ -12,11 +12,9 @@ accumulate into brighter color the way actual patina builds on metal.
 
 ![Grand Rapids, three themes: noir_heat, blueprint_heat, warm_beige](assets/example-gallery.png)
 
-The gallery above is the bundled `fixtures/activities.json`, sourced from
-public Strava cycling and running segments for Grand Rapids. Athlete
-IDs are zeroed, gear IDs are placeholders, segment names are generic
-identifiers. The repo ships zero real-rider data and zero
-maintainer-attributable coordinates.
+The gallery above is the bundled `fixtures/activities.json`: seeded
+random walks over the Grand Rapids road graph, fully synthetic. The
+repo ships zero real-rider data.
 
 ## Quickstart
 
@@ -87,6 +85,8 @@ patinate render --theme cycle_heat --anonymize --obfuscation-radius-m 1000 --out
 ```
 
 `--anonymize` drops the `data-*` attrs and `<desc>`; a PNG hides no more.
+It also warns when `[general]` center sits within the radius plus
+`offset_m` of home, since the frame centers on it.
 
 ## Subcommands
 
@@ -101,7 +101,9 @@ patinate render --theme cycle_heat --anonymize --obfuscation-radius-m 1000 --out
 ## Themes
 
 Four themes baked into the binary. `--themes-dir <dir>` adds custom
-`*.json` themes alongside.
+`*.json` themes alongside. The heat core multiplies on a light `bg`
+and screens on a dark one; `heat.blend` (`normal`, `multiply`,
+`screen`) pins it.
 
 | Preview | Theme | Palette | Use when |
 |---|---|---|---|
@@ -122,7 +124,7 @@ Four themes baked into the binary. `--themes-dir <dir>` adds custom
 | `--gear <id>` | Strava `gear_id` filter. Repeatable. |
 | `--activity-id <n>` | Render a single activity by Strava ID. |
 | `--min-distance-m <m>` | Drop sub-`m` noise stubs. Default `1000`. |
-| `--web` | Single-layer heat, precision-1 coords, no typography, no minor roads. Inline-embed preset. |
+| `--web` | Inline-embed preset: lighter glow, compact paths sized to the viewbox, no typography, no minor roads or streams. |
 | `--transparent-bg` | Skip the background rect. For inlining over a page background. |
 | `--heat-only` | Skip basemap; render heat plus typography only. |
 | `--anonymize` | Strip `data-*` from heat paths and scrub `<desc>`. Use for public publication. |
@@ -131,6 +133,7 @@ Four themes baked into the binary. `--themes-dir <dir>` adds custom
 | `--heat-alpha <f>` | Multiplier on sharp-core stroke opacity. |
 | `--radius-m <m>` | Override the configured map radius. |
 | `--viewbox-width <px>` / `--viewbox-height <px>` | Override viewBox dimensions. |
+| `--fit <contain\|cover>` | `contain` (default) letterboxes the radius circle; `cover` fills the viewBox and crops. The frame never depends on rides or home. |
 | `--no-refine` | Skip OSM filter pipeline. Diagnostic. |
 | `--config <path>` | TOML config. Default `~/.config/patinate/config.toml`. |
 | `--osm <path>` | Pre-fetched OSM JSON. Default per-user cache. |
@@ -143,13 +146,13 @@ Four themes baked into the binary. `--themes-dir <dir>` adds custom
 <details>
 <summary><strong>Embed in a page</strong></summary>
 
-The `cycle.dunn.dev` recipe: render once, rasterize to WebP, ship
-the WebP. The consumer page provides its own typography (the `--web`
-preset skips it).
+One way to embed: render once, rasterize to WebP, ship the WebP. The
+consumer page provides its own typography (the `--web` preset skips
+it).
 
 ```bash
 patinate render --theme cycle_heat --cycling --web --transparent-bg \
-  --radius-m 12000 --viewbox-width 1200 --viewbox-height 720 \
+  --radius-m 12000 --viewbox-width 1200 --viewbox-height 720 --fit cover \
   --out hero.svg
 
 rsvg-convert hero.svg -w 3600 -h 2160 -o /tmp/hero.png
@@ -208,8 +211,8 @@ Generic figment override: `PATINATE_<SECTION>__<KEY>`. Example:
   `PATINATE_OVERPASS_ENDPOINT` for a private mirror.
 - **No JSON-log conventions.** `tracing` keys are ad-hoc.
 - **`--web` is a preset, not a separate renderer.** Drops typography,
-  glow stack, and minor road tiers; trims coords. Pair with
-  `--transparent-bg` for inline embeds.
+  minor road tiers and streams, lightens the glow, compacts paths. Pair
+  with `--transparent-bg` for inline embeds.
 
 </details>
 

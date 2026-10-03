@@ -10,14 +10,15 @@ use std::fmt::Write as _;
 use anyhow::Result;
 use svg::Document;
 use svg::node::element::{
-    Definitions, Description, Group, LinearGradient, Path, Rectangle, Stop, Title,
+    Definitions, Description, Group, LinearGradient, Path, Rectangle, Stop, Title, Use,
 };
 
 use crate::config::ValidatedConfig;
 use crate::obfuscation::ObfuscatedActivity;
 use crate::osm::{Basemap, LatLon};
-use crate::render::projection::Projection;
-use crate::render::theme::{RoadTier, Theme};
+use crate::render::path::{Compact, signed_area2};
+use crate::render::projection::{Fit, Projection};
+use crate::render::theme::{HeatBlend, RoadTier, Theme};
 use crate::render::typography;
 
 /// Per-render overrides on top of the theme's baked values.
@@ -53,11 +54,13 @@ impl Default for HeatTuning {
 
 /// Top-level entry. Returns the SVG document as a string.
 /// - `heat_only`: skip basemap (water, parks, roads).
-/// - `web`: web-embed preset — single-layer heat (no glow stack),
-///   coord precision 1, no own typography. Targets ~500KB for inline
-///   use on a consumer page.
+/// - `web`: web-embed preset — a lighter glow, compact merged paths
+///   (`render::path::Compact`), no own typography. Targets a small
+///   inline SVG for a consumer page.
 /// - `transparent_bg`: skip the bg rect so the SVG paints over the
 ///   consumer page's own background. Combine with `web` for inline.
+/// - `fit`: letterbox (`Contain`) or crop (`Cover`) the radius circle
+///   into the viewbox.
 /// - `tuning`: runtime knobs that scale the theme's bloom and core
 ///   alpha. See `HeatTuning` for semantics.
 #[allow(clippy::too_many_arguments)]
@@ -69,6 +72,7 @@ pub fn render(
     heat_only: bool,
     web: bool,
     transparent_bg: bool,
+    fit: Fit,
     tuning: HeatTuning,
 ) -> Result<String> {
     let viewbox_w = config.viewbox_width as f64;
@@ -80,7 +84,12 @@ pub fn render(
         config.radius_m,
         config.viewbox_width,
         config.viewbox_height,
+        fit,
     )?;
+
+    // The web preset's compact path writer; posters keep plain paths.
+    let compact = web.then(|| Compact::for_viewbox(viewbox_w, viewbox_h));
+    let compact = compact.as_ref();
 
     // Defs: fade gradients.
     let defs = build_defs(theme);
@@ -99,29 +108,39 @@ pub fn render(
         theme.water.as_str(),
         "water",
         &proj,
+        compact,
     );
 
-    // Water lines (rivers, streams — stroke). The Grand River is here.
+    // Water lines (rivers, canals, streams — stroke). The Grand River is
+    // here. The web preset leaves streams out: they are most of the
+    // water bytes and read as noise at embed size.
+    let streams = if web { &[][..] } else { &basemap.streams[..] };
     let water_lines = build_line_group(
-        &basemap.water_lines,
+        basemap.water_lines.iter().chain(streams),
         theme.water.as_str(),
         theme.water_line_width,
         "water-lines",
         &proj,
+        compact,
     );
 
     // Parks (filled polygons).
-    let parks = build_polygon_group(&basemap.parks, theme.parks.as_str(), "parks", &proj);
+    let parks = build_polygon_group(
+        &basemap.parks,
+        theme.parks.as_str(),
+        "parks",
+        &proj,
+        compact,
+    );
 
     // Roads (one sub-group per tier, drawn residential first so motorways
     // sit on top). Web mode drops tertiary + residential to keep the
     // inline SVG inside its file-size budget.
-    let roads = build_roads(basemap, theme, &proj, web);
+    let roads = build_roads(basemap, theme, &proj, web, compact);
 
-    // Heat: three-layer glow for posters, single-layer for web embed.
-    // Web variant also drops one digit of float precision in `d`
-    // strings — about a 25% file-size reduction on a dense city.
-    let heat = build_heat(activities, theme, &proj, web, tuning);
+    // Heat: one path group drawn by a three-layer <use> glow stack.
+    // Web variant lightens the glow and writes compact paths.
+    let heat = build_heat(activities, theme, &proj, web, compact, tuning);
 
     // Fades (top + bottom rects pointing at the gradients).
     let fades = build_fades(viewbox_w, viewbox_h, theme);
@@ -314,23 +333,56 @@ fn build_fades(viewbox_w: f64, viewbox_h: f64, theme: &Theme) -> Group {
         .add(bot_rect)
 }
 
-/// Build a closed-polygon group from a list of boundary rings.
-fn build_polygon_group(rings: &[Vec<LatLon>], fill: &str, class: &str, proj: &Projection) -> Group {
-    let mut g = Group::new()
-        .set("class", class)
-        .set("fill", fill)
-        .set("stroke", "none");
-    for ring in rings {
-        if ring.len() < 2 {
-            continue;
+/// Add one `<path>` per line to `g`, or under `compact` (the web
+/// preset) a single merged path. Merging is lossless here: every line
+/// in a basemap group shares one opaque style, and rings are turned to
+/// one winding first so the nonzero rule fills them as a union.
+fn add_lines<'a>(
+    mut g: Group,
+    lines: impl IntoIterator<Item = &'a Vec<LatLon>>,
+    closed: bool,
+    proj: &Projection,
+    compact: Option<&Compact>,
+) -> Group {
+    let Some(c) = compact else {
+        for line in lines {
+            if line.len() < 2 {
+                continue;
+            }
+            let d = polyline_to_path(line, proj, closed);
+            if !d.is_empty() {
+                g = g.add(Path::new().set("d", d));
+            }
         }
-        let d = polyline_to_path(ring, proj, true);
-        if d.is_empty() {
-            continue;
+        return g;
+    };
+    let mut d = String::new();
+    for line in lines {
+        let mut pts: Vec<(f64, f64)> = line.iter().map(|p| proj.project_latlon(*p)).collect();
+        if closed && signed_area2(&pts) < 0.0 {
+            pts.reverse();
         }
+        c.write(&mut d, &pts, closed);
+    }
+    if !d.is_empty() {
         g = g.add(Path::new().set("d", d));
     }
     g
+}
+
+/// Build a closed-polygon group from a list of boundary rings.
+fn build_polygon_group(
+    rings: &[Vec<LatLon>],
+    fill: &str,
+    class: &str,
+    proj: &Projection,
+    compact: Option<&Compact>,
+) -> Group {
+    let g = Group::new()
+        .set("class", class)
+        .set("fill", fill)
+        .set("stroke", "none");
+    add_lines(g, rings, true, proj, compact)
 }
 
 /// Build one tier's stroke layer. Used by both the solid road pass
@@ -342,6 +394,7 @@ fn build_road_layer(
     class: &str,
     opacity: Option<f32>,
     proj: &Projection,
+    compact: Option<&Compact>,
 ) -> Group {
     let mut g = Group::new()
         .set("class", class.to_string())
@@ -353,64 +406,38 @@ fn build_road_layer(
     if let Some(o) = opacity {
         g = g.set("opacity", o);
     }
-    for geom in geoms {
-        if geom.len() < 2 {
-            continue;
-        }
-        let d = polyline_to_path(geom, proj, false);
-        if !d.is_empty() {
-            g = g.add(Path::new().set("d", d));
-        }
-    }
-    g
+    add_lines(g, geoms.iter().copied(), false, proj, compact)
 }
 
 /// Build an open-line group from a list of polylines (rivers, streams).
-fn build_line_group(
-    lines: &[Vec<LatLon>],
+fn build_line_group<'a>(
+    lines: impl IntoIterator<Item = &'a Vec<LatLon>>,
     stroke: &str,
     width: f32,
     class: &str,
     proj: &Projection,
+    compact: Option<&Compact>,
 ) -> Group {
-    let mut g = Group::new()
+    let g = Group::new()
         .set("class", class)
         .set("fill", "none")
         .set("stroke", stroke)
         .set("stroke-width", width)
         .set("stroke-linecap", "round")
         .set("stroke-linejoin", "round");
-    for line in lines {
-        if line.len() < 2 {
-            continue;
-        }
-        let d = polyline_to_path(line, proj, false);
-        if d.is_empty() {
-            continue;
-        }
-        g = g.add(Path::new().set("d", d));
-    }
-    g
-}
-
-/// Average channel of a `#rrggbb` color as a perceptual proxy. Themes
-/// with a dark background get the major-road halo (helps light-on-dark
-/// freeways stand out from the residential mesh); light-bg themes skip
-/// it (the halo reads as a shadow on cream paper without adding signal).
-fn bg_is_dark(bg_hex: &str) -> bool {
-    let s = bg_hex.trim_start_matches('#');
-    if s.len() != 6 {
-        return true;
-    }
-    let parse = |i| u32::from_str_radix(&s[i..i + 2], 16).unwrap_or(128);
-    let avg = (parse(0) + parse(2) + parse(4)) / 3;
-    avg < 128
+    add_lines(g, lines, false, proj, compact)
 }
 
 /// Build the road group: one sub-group per tier, residential first.
 /// `web` skips the two minor tiers (tertiary + residential) so all
 /// `--web` semantics live in one place.
-fn build_roads(basemap: &Basemap, theme: &Theme, proj: &Projection, web: bool) -> Group {
+fn build_roads(
+    basemap: &Basemap,
+    theme: &Theme,
+    proj: &Projection,
+    web: bool,
+    compact: Option<&Compact>,
+) -> Group {
     // Bucket roads by tier in a single pass.
     let mut buckets: HashMap<RoadTier, Vec<&Vec<LatLon>>> = HashMap::new();
     for road in &basemap.roads {
@@ -444,8 +471,7 @@ fn build_roads(basemap: &Basemap, theme: &Theme, proj: &Projection, web: bool) -
             // no halo because the dark sepia road color is high-contrast
             // enough on cream that an extra glow reads as a shadow rather
             // than a presence-amplifier.
-            if matches!(tier, RoadTier::Motorway | RoadTier::Trunk) && bg_is_dark(theme.bg.as_str())
-            {
+            if matches!(tier, RoadTier::Motorway | RoadTier::Trunk) && !theme.bg.is_light() {
                 roads = roads.add(build_road_layer(
                     geoms,
                     style.color.as_str(),
@@ -453,6 +479,7 @@ fn build_roads(basemap: &Basemap, theme: &Theme, proj: &Projection, web: bool) -
                     &format!("{class}-glow"),
                     Some(0.05),
                     proj,
+                    compact,
                 ));
             }
             // Solid stroke.
@@ -463,6 +490,7 @@ fn build_roads(basemap: &Basemap, theme: &Theme, proj: &Projection, web: bool) -
                 class,
                 None,
                 proj,
+                compact,
             ));
         }
     }
@@ -480,10 +508,8 @@ fn tier_class(tier: RoadTier) -> &'static str {
     }
 }
 
-/// Build the heat group. Two render modes:
-///
-/// **Poster (web=false):** three concentric stroke layers per ride for
-/// the painterly glow stack:
+/// Build the heat group: the ride paths once under a per-render `#heat-<hash>` id, then
+/// three `<use>` layers of it for the painterly glow stack:
 ///   outer halo (`heat.glow_outer_ratio` x width, `heat.glow_outer_alpha`)
 ///   inner halo (`heat.glow_inner_ratio` x width, `heat.glow_inner_alpha`)
 ///   sharp core (1.0 x width, `heat.alpha`)
@@ -491,8 +517,9 @@ fn tier_class(tier: RoadTier) -> &'static str {
 /// warm_beige) lift the halo opacity in their JSON so the bloom registers
 /// against a warm background.
 ///
-/// **Web (web=true):** single sharp-core layer only, coord precision
-/// dropped from 2 to 1 digit. Targets a small inline-on-page SVG.
+/// **Web (web=true):** halo opacity halved and paths written by
+/// `Compact`, each ride still its own path so overlaps build heat.
+/// `bloom = 0` keeps only the core.
 ///
 /// **Privacy invariant:** activities with empty `clipped_segments` are
 /// dropped, never falling back to the raw `summary_polyline`. The
@@ -502,10 +529,9 @@ fn build_heat(
     theme: &Theme,
     proj: &Projection,
     web: bool,
+    compact: Option<&Compact>,
     tuning: HeatTuning,
 ) -> Group {
-    let precision: usize = if web { 1 } else { 2 };
-
     // Path-break threshold in viewbox units, derived from the projection
     // so the value scales with viewport and radius. 600 m is wider than
     // any plausible bike-trail bridge but narrower than the Grand River
@@ -540,7 +566,13 @@ fn build_heat(
                 .iter()
                 .map(|&(lat, lng)| proj.project(lat, lng))
                 .collect();
-            let piece = points_to_heat_path(&projected, precision, max_gap_units);
+            if let Some(c) = compact {
+                for run in split_at_gaps(&projected, max_gap_units) {
+                    c.write(&mut d, run, false);
+                }
+                continue;
+            }
+            let piece = points_to_heat_path(&projected, max_gap_units);
             if piece.is_empty() {
                 continue;
             }
@@ -558,66 +590,97 @@ fn build_heat(
     // their alphas (so bloom=0 collapses to no-halo, bloom=2 doubles
     // both extent and presence). `alpha` scales just the sharp-core
     // opacity. Tuning factors clamp at 0 to keep stroke-opacity sane.
+    // The web preset keeps the halos at `WEB_GLOW` of their opacity: a
+    // lighter glow that costs a few hundred bytes, since every layer
+    // reuses the one path group.
+    const WEB_GLOW: f32 = 0.5;
     let bloom = tuning.bloom.max(0.0);
+    let halo_alpha = |a: f32| (a * bloom * if web { WEB_GLOW } else { 1.0 }).min(1.0);
     let core_alpha = (theme.heat.alpha * tuning.alpha.max(0.0)).min(1.0);
-    let core_layer = ("heat", theme.heat.width, core_alpha);
+    let core_layer = ("heat-core", theme.heat.width, core_alpha);
 
-    let layers_owned: Vec<(&str, f32, f32)> = if web || bloom == 0.0 {
+    let layers: Vec<(&str, f32, f32)> = if bloom == 0.0 {
         vec![core_layer]
     } else {
         vec![
             (
                 "heat-outer",
                 theme.heat.width * theme.heat.glow_outer_ratio * bloom,
-                (theme.heat.glow_outer_alpha * bloom).min(1.0),
+                halo_alpha(theme.heat.glow_outer_alpha),
             ),
             (
                 "heat-inner",
                 theme.heat.width * theme.heat.glow_inner_ratio * bloom,
-                (theme.heat.glow_inner_alpha * bloom).min(1.0),
+                halo_alpha(theme.heat.glow_inner_alpha),
             ),
             core_layer,
         ]
     };
-    let layers: &[(&str, f32, f32)] = &layers_owned;
 
-    let mut stack = Group::new().set("class", "heat-stack");
-    for &(class, width, alpha) in layers {
-        // Outer halo layers use NORMAL blend (additive wash, no
-        // darkening). Sharp core uses multiply (saturates where many
-        // rides overlap). Mixed-mode keeps cream paper warm under the
-        // glow, only the rideline cores press into deep saturation.
-        let blend = if class == "heat" {
-            "mix-blend-mode: multiply"
-        } else {
-            "mix-blend-mode: normal"
-        };
-        let mut g = Group::new()
-            .set("class", class)
-            .set("fill", "none")
-            .set("stroke", theme.heat.color.as_str())
-            .set("stroke-width", width)
-            .set("stroke-opacity", alpha)
-            .set("stroke-linecap", "round")
-            .set("stroke-linejoin", "round")
-            .set("style", blend);
-        for (obf, d) in &decoded {
-            let act = obf.activity();
-            let mut p = Path::new().set("d", d.clone());
-            // data-* attrs only on the sharp core layer (web JS targets
-            // it). `anonymize` suppresses them entirely so a published
-            // SVG cannot be linked back to the operator's Strava profile
-            // via athlete_id or gear_id.
-            if class == "heat" && !tuning.anonymize {
-                p = p
-                    .set("data-rider", act.athlete_id.to_string())
-                    .set("data-bike", act.gear_id.clone().unwrap_or_default())
-                    .set("data-year", act.start_date.format("%Y").to_string())
-                    .set("data-type", act.activity_type.as_data_attr());
-            }
-            g = g.add(p);
+    // The ride paths are written once, bare, under that id; each
+    // layer is a `<use>` whose stroke, width and opacity the clone
+    // inherits. A path that set any of those itself would pin every
+    // layer to one value, so paths carry only `d` and data attrs.
+    //
+    // The id derives from the theme and the path data (which already
+    // encodes the viewbox), so two renders inlined into one page never
+    // share a `<use>` target.
+    let heat_id = {
+        use sha2::{Digest, Sha256};
+        let mut h = Sha256::new();
+        h.update(theme.name.as_bytes());
+        h.update(proj.scale_per_meter().to_bits().to_le_bytes());
+        for (_, d) in &decoded {
+            h.update([0]);
+            h.update(d.as_bytes());
         }
-        stack = stack.add(g);
+        let digest = h.finalize();
+        format!(
+            "heat-{:02x}{:02x}{:02x}{:02x}",
+            digest[0], digest[1], digest[2], digest[3]
+        )
+    };
+    let mut paths = Group::new().set("id", heat_id.clone()).set("class", "heat");
+    for (obf, d) in &decoded {
+        let act = obf.activity();
+        let mut p = Path::new().set("d", d.clone());
+        // data-* attrs feed consumer JS (`.heat path[data-type]`).
+        // `anonymize` suppresses them entirely so a published SVG
+        // cannot be linked back to the operator's Strava profile via
+        // athlete_id or gear_id.
+        if !tuning.anonymize {
+            p = p
+                .set("data-rider", act.athlete_id.to_string())
+                .set("data-bike", act.gear_id.clone().unwrap_or_default())
+                .set("data-year", act.start_date.format("%Y").to_string())
+                .set("data-type", act.activity_type.as_data_attr());
+        }
+        paths = paths.add(p);
+    }
+
+    let mut stack = Group::new()
+        .set("class", "heat-stack")
+        .set("fill", "none")
+        .set("stroke", theme.heat.color.as_str())
+        .set("stroke-linecap", "round")
+        .set("stroke-linejoin", "round")
+        .add(Definitions::new().add(paths));
+    for (class, width, alpha) in layers {
+        let mut u = Use::new()
+            .set("href", format!("#{heat_id}"))
+            .set("class", class)
+            .set("stroke-width", width)
+            .set("stroke-opacity", alpha);
+        // Halos composite normally (a wash, no darkening). The sharp
+        // core takes the theme's blend: multiply presses rides into
+        // cream paper, screen lifts them off a dark ground.
+        if class == "heat-core" {
+            let blend = theme.heat_blend();
+            if blend != HeatBlend::Normal {
+                u = u.set("style", format!("mix-blend-mode: {}", blend.as_css()));
+            }
+        }
+        stack = stack.add(u);
     }
     stack
 }
@@ -654,29 +717,45 @@ fn points_to_path_string(pts: &[(f64, f64)]) -> String {
     s
 }
 
+/// Split a projected ride into runs wherever consecutive points sit
+/// farther apart than `max_gap_units` (see `points_to_heat_path`).
+fn split_at_gaps(pts: &[(f64, f64)], max_gap_units: f64) -> Vec<&[(f64, f64)]> {
+    let max_gap_sq = max_gap_units * max_gap_units;
+    let mut runs = Vec::new();
+    let mut start = 0;
+    for i in 1..pts.len() {
+        let (dx, dy) = (pts[i].0 - pts[i - 1].0, pts[i].1 - pts[i - 1].1);
+        if dx * dx + dy * dy > max_gap_sq {
+            runs.push(&pts[start..i]);
+            start = i;
+        }
+    }
+    runs.push(&pts[start..]);
+    runs
+}
+
 /// Heat-only variant. Strava `summary_polyline` is heavily decimated;
 /// for some long rides two consecutive points end up far apart and a
 /// straight `L` between them draws across geography the ride doesn't
 /// actually cross. When a segment exceeds `max_gap_units`, emit `M`
 /// to break the path instead of bridging the gap.
 ///
-/// `precision` is the float decimal precision used in the `d` string.
-/// 2 for poster output (sub-pixel positioning at 1200x1600), 1 for the
-/// web preset (file-size budget; visual diff at viewport scale is nil).
+/// Poster output only, at two decimals; the web preset splits rides
+/// with `split_at_gaps` and writes them with `Compact`.
 ///
 /// `max_gap_units` is the threshold in projected SVG units beyond which
 /// consecutive points are treated as discontinuous. The caller derives
 /// this from the projection (units-per-meter * threshold-in-meters) so
 /// the value scales with viewport and radius rather than being a magic
 /// number tuned to a single resolution.
-fn points_to_heat_path(pts: &[(f64, f64)], precision: usize, max_gap_units: f64) -> String {
+fn points_to_heat_path(pts: &[(f64, f64)], max_gap_units: f64) -> String {
     let max_gap_sq = max_gap_units * max_gap_units;
     if pts.len() < 2 {
         return String::new();
     }
     let mut s = String::with_capacity(pts.len() * 16);
     let (x0, y0) = pts[0];
-    let _ = write!(s, "M{:.*} {:.*}", precision, x0, precision, y0);
+    let _ = write!(s, "M{x0:.2} {y0:.2}");
     let mut prev = pts[0];
     for &(x, y) in &pts[1..] {
         let dx = x - prev.0;
@@ -686,7 +765,7 @@ fn points_to_heat_path(pts: &[(f64, f64)], precision: usize, max_gap_units: f64)
         } else {
             'L'
         };
-        let _ = write!(s, " {cmd}{:.*} {:.*}", precision, x, precision, y);
+        let _ = write!(s, " {cmd}{x:.2} {y:.2}");
         prev = (x, y);
     }
     s
@@ -711,7 +790,7 @@ mod tests {
             activity_type: ActivityType::Ride,
             start_date: Utc::now(),
             start_lat: 42.95,
-            start_lng: -85.65,
+            start_lng: -85.73,
             distance_m: 5000.0,
             moving_time_s: 600,
             summary_polyline: polyline,
@@ -733,15 +812,15 @@ mod tests {
 
         let coords = vec![
             geo_types::Coord {
-                x: -85.65_f64,
+                x: -85.73_f64,
                 y: 42.95_f64,
             },
             geo_types::Coord {
-                x: -85.64,
+                x: -85.72,
                 y: 42.955,
             },
             geo_types::Coord {
-                x: -85.63,
+                x: -85.71,
                 y: 42.98,
             },
         ];
@@ -771,6 +850,7 @@ mod tests {
             false,
             false,
             false,
+            Fit::Contain,
             HeatTuning::default(),
         )
         .expect("render ok");
@@ -787,8 +867,9 @@ mod tests {
         assert!(svg.contains("data-bike=\"bSCRUBBED1\""));
         assert!(svg.contains("data-type=\"Ride\""));
 
-        // Web variant: single-layer heat, precision-1 coords, no
-        // typography group.
+        // Web variant: no typography, and a lighter glow. Every layer
+        // is a <use> of the one path group, so each ride's path is
+        // written once whatever the layer count.
         let svg_web = render(
             &cfg,
             &basemap,
@@ -797,18 +878,275 @@ mod tests {
             false,
             true,
             true,
+            Fit::Contain,
             HeatTuning::default(),
         )
         .expect("render web");
-        assert!(svg_web.contains("class=\"heat\""));
+        for layer in ["heat-outer", "heat-inner", "heat-core"] {
+            assert_eq!(
+                svg_web.matches(&format!("class=\"{layer}\"")).count(),
+                1,
+                "{layer} layer in the web variant"
+            );
+        }
+        assert_eq!(svg.matches("data-rider=\"1\"").count(), 2);
+        // Every hop in this sparse ride breaks at the 600 m gap, so it
+        // draws nothing; the web writer drops it rather than ship a
+        // path of bare movetos.
+        assert_eq!(svg_web.matches("data-rider=\"1\"").count(), 0);
+        let outer_alpha = |s: &str| -> f32 {
+            let tail = &s[s.find("class=\"heat-outer\"").expect("outer")..];
+            let at = tail.find("stroke-opacity=\"").expect("opacity") + 16;
+            tail[at..at + tail[at..].find('"').unwrap()]
+                .parse()
+                .unwrap()
+        };
         assert!(
-            !svg_web.contains("class=\"heat-outer\""),
-            "web variant should drop the outer halo layer"
+            outer_alpha(&svg_web) < outer_alpha(&svg),
+            "web glow should be lighter than the poster's"
         );
+    }
+
+    /// Posters stroke streams with the rivers; the web preset leaves
+    /// them out and keeps the rivers.
+    #[test]
+    fn web_drops_streams_keeps_rivers() {
+        let cfg = config::load("fixtures/config.toml").expect("config loads");
+        let theme = theme::load_named("noir_heat", None).expect("embedded theme loads");
+        let line = |lng: f64| {
+            vec![
+                LatLon {
+                    lat: 42.95,
+                    lon: lng,
+                },
+                LatLon {
+                    lat: 42.97,
+                    lon: lng,
+                },
+            ]
+        };
+        let basemap = Basemap {
+            water_lines: vec![line(-85.74)],
+            streams: vec![line(-85.72)],
+            ..Basemap::default()
+        };
+        let water_lines = |web: bool| -> String {
+            let svg = render(
+                &cfg,
+                &basemap,
+                &[],
+                &theme,
+                false,
+                web,
+                false,
+                Fit::Contain,
+                HeatTuning::default(),
+            )
+            .expect("render ok");
+            let start = svg
+                .find("class=\"water-lines\"")
+                .expect("water-lines group");
+            let end = start + svg[start..].find("</g>").expect("group close");
+            svg[start..end].to_string()
+        };
+        // Each line is one M..L run, merged or not.
+        assert_eq!(water_lines(false).matches('M').count(), 2, "poster");
+        assert_eq!(water_lines(true).matches('M').count(), 1, "web");
+    }
+
+    /// The `heat-<8 hex>` id of the ride-path group.
+    fn heat_id(svg: &str) -> &str {
+        let open = "<g class=\"heat\" id=\"";
+        let at = svg.find(open).expect("heat-paths group") + open.len();
+        &svg[at..at + "heat-".len() + 8]
+    }
+
+    /// The SVG between the heat path group's open and close tags.
+    fn heat_paths_inner(svg: &str) -> &str {
+        let open = format!("<g class=\"heat\" id=\"{}\">", heat_id(svg));
+        let start = svg.find(&open).expect("heat-paths group") + open.len();
+        let end = start + svg[start..].find("</g>").expect("group close");
+        &svg[start..end]
+    }
+
+    /// Small synthetic heat-only render on a 300x300 viewbox.
+    fn small_heat_render(web: bool) -> String {
+        let mut cfg = config::load("fixtures/config.toml").expect("config loads");
+        cfg.viewbox_width = 300;
+        cfg.viewbox_height = 300;
+        cfg.radius_m = 4000.0;
+        let theme = theme::load_named("cycle_heat", None).expect("embedded theme loads");
+        // Densify each leg to ~100 m steps so no hop trips the 600 m
+        // gap break and the rides draw as continuous lines.
+        let coords = |pts: &[(f64, f64)]| {
+            let mut c = Vec::new();
+            for w in pts.windows(2) {
+                for i in 0..20 {
+                    let t = i as f64 / 20.0;
+                    c.push(geo_types::Coord {
+                        x: w[0].1 + (w[1].1 - w[0].1) * t,
+                        y: w[0].0 + (w[1].0 - w[0].0) * t,
+                    });
+                }
+            }
+            let &(y, x) = pts.last().unwrap();
+            c.push(geo_types::Coord { x, y });
+            polyline::encode_coordinates(c, 5).expect("encode")
+        };
+        let activities = vec![
+            synthetic_activity(
+                1,
+                coords(&[(42.95, -85.74), (42.96, -85.73), (42.97, -85.72)]),
+            ),
+            synthetic_activity(
+                2,
+                coords(&[(42.97, -85.76), (42.95, -85.72), (42.94, -85.70)]),
+            ),
+        ];
+        let obf = obfuscation::apply(
+            activities,
+            ObfuscationParams {
+                home_lat: cfg.home_lat,
+                home_lng: cfg.home_lng,
+                radius_m: 0.0,
+                salt: None,
+                offset_m: 750.0,
+            },
+        )
+        .expect("obfuscate");
+        let tuning = HeatTuning {
+            bloom: 1.8,
+            ..HeatTuning::default()
+        };
+        render(
+            &cfg,
+            &Basemap::default(),
+            &obf,
+            &theme,
+            true,
+            web,
+            false,
+            Fit::Contain,
+            tuning,
+        )
+        .expect("render ok")
+    }
+
+    #[test]
+    fn frame_ignores_activities_and_home() {
+        // Rides cluster around home, so a frame fitted to them would
+        // point at it. Everything drawn before the heat (viewBox,
+        // basemap) must come out the same whatever the rides and home.
+        let cfg = config::load("fixtures/config.toml").expect("config loads");
+        let theme = theme::load_named("cycle_heat", None).expect("theme loads");
+        let basemap = osm::load("fixtures/grand-rapids.osm.json.gz").expect("osm loads");
+        let raw = std::fs::read_to_string("fixtures/activities.json").expect("fixture");
+        let rides: Vec<Activity> = serde_json::from_str(&raw).expect("activities parse");
+        let frame = |cfg: &ValidatedConfig, rides: Vec<Activity>| -> String {
+            let obf = obfuscation::apply(
+                rides,
+                ObfuscationParams {
+                    home_lat: cfg.home_lat,
+                    home_lng: cfg.home_lng,
+                    radius_m: 0.0,
+                    salt: None,
+                    offset_m: 750.0,
+                },
+            )
+            .expect("obfuscate");
+            let svg = render(
+                cfg,
+                &basemap,
+                &obf,
+                &theme,
+                false,
+                true,
+                true,
+                Fit::Cover,
+                HeatTuning::default(),
+            )
+            .expect("render ok");
+            svg[..svg.find("<g class=\"heat-stack\"").expect("heat")].to_string()
+        };
+        let base = frame(&cfg, rides.clone());
+        assert!(base.contains("class=\"roads\""), "basemap must draw");
+
+        let mut moved = cfg.clone();
+        moved.home_lat += 0.2;
+        moved.home_lng -= 0.3;
+        let east: Vec<Activity> = rides[..rides.len() / 4].to_vec();
+        assert_eq!(frame(&moved, Vec::new()), base, "no rides, home moved");
+        assert_eq!(frame(&cfg, east), base, "a quarter of the rides");
+    }
+
+    #[test]
+    fn heat_paths_set_no_presentation_attrs() {
+        for web in [false, true] {
+            let svg = small_heat_render(web);
+            let inner = heat_paths_inner(&svg);
+            assert_eq!(inner.matches("<path").count(), 2);
+            for attr in ["stroke", "fill", "opacity", "style"] {
+                assert!(!inner.contains(attr), "a heat path sets {attr}: {inner}");
+            }
+            assert_eq!(svg.matches("<use ").count(), 3);
+            let id = heat_id(&svg);
+            assert_eq!(svg.matches(&format!("href=\"#{id}\"")).count(), 3);
+        }
+    }
+
+    #[test]
+    fn heat_id_differs_per_render() {
+        let (poster, web) = (small_heat_render(false), small_heat_render(true));
+        assert_ne!(heat_id(&poster), heat_id(&web));
+        assert_eq!(heat_id(&poster), heat_id(&small_heat_render(false)));
+    }
+
+    /// Rasterizes the use-stack render and the same render with every
+    /// `<use>` expanded into a group holding a copy of the paths (the
+    /// shape the stack had before), and compares the pixels. Needs
+    /// `rsvg-convert` on PATH; `just check-pixels` runs it.
+    #[test]
+    #[ignore = "needs rsvg-convert; run with `just check-pixels`"]
+    fn use_stack_matches_inlined_layers_in_pixels() {
+        let svg = small_heat_render(false);
+        let inner = heat_paths_inner(&svg).to_string();
+        let id = heat_id(&svg).to_string();
+        let defs_start = svg.find("<defs>\n<g class=\"heat\"").expect("heat defs");
+        let defs_end = defs_start + svg[defs_start..].find("</defs>").unwrap() + "</defs>".len();
+        let mut inlined = format!("{}{}", &svg[..defs_start], &svg[defs_end..]);
+        while let Some(at) = inlined.find("<use ") {
+            let end = at + inlined[at..].find("/>").unwrap();
+            let attrs = inlined[at + 5..end].replace(&format!("href=\"#{id}\" "), "");
+            inlined.replace_range(at..end + 2, &format!("<g {attrs}>{inner}</g>"));
+        }
+        assert!(!inlined.contains(&id));
+
+        let dir = std::env::temp_dir().join(format!("patinate-pixels-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let raster = |name: &str, body: &str| -> Vec<u8> {
+            let src = dir.join(format!("{name}.svg"));
+            let png = dir.join(format!("{name}.png"));
+            std::fs::write(&src, body).unwrap();
+            let ok = std::process::Command::new("rsvg-convert")
+                .arg(&src)
+                .arg("-o")
+                .arg(&png)
+                .status()
+                .expect("rsvg-convert runs")
+                .success();
+            assert!(ok, "rsvg-convert failed on {name}");
+            std::fs::read(&png).unwrap()
+        };
+        let a = raster("use", &svg);
+        let b = raster("inlined", &inlined);
+        let no_heat: String = svg.lines().filter(|l| !l.starts_with("<use ")).collect();
+        let bare = raster("bare", &no_heat);
+        std::fs::remove_dir_all(&dir).ok();
         assert!(
-            !svg_web.contains("class=\"heat-inner\""),
-            "web variant should drop the inner halo layer"
+            a != bare,
+            "the heat must draw, or the comparison proves nothing"
         );
+        assert!(a == b, "use stack and inlined layers rasterize differently");
     }
 
     #[test]
@@ -818,7 +1156,7 @@ mod tests {
         let theme = theme::load_named("noir_heat", None).expect("embedded theme loads");
         let secret = "synthetic-salt-must-not-render";
         let coords = (0..=120).map(|i| geo_types::Coord {
-            x: -85.70 + 0.001 * i as f64,
+            x: -85.78 + 0.001 * i as f64,
             y: 42.95,
         });
         let polyline_str = polyline::encode_coordinates(coords, 5).expect("encode");
@@ -826,7 +1164,7 @@ mod tests {
             vec![synthetic_activity(1, polyline_str)],
             ObfuscationParams {
                 home_lat: 42.95,
-                home_lng: -85.64,
+                home_lng: -85.72,
                 radius_m: 250.0,
                 salt: Some(obfuscation::PrivacySalt::new(secret).expect("salt")),
                 offset_m: 750.0,
@@ -847,6 +1185,7 @@ mod tests {
                 false,
                 false,
                 false,
+                Fit::Contain,
                 tuning,
             )
             .expect("render ok");
@@ -864,11 +1203,11 @@ mod tests {
         let basemap = Basemap::default();
         let coords = vec![
             geo_types::Coord {
-                x: -85.65_f64,
+                x: -85.73_f64,
                 y: 42.95_f64,
             },
             geo_types::Coord {
-                x: -85.64,
+                x: -85.72,
                 y: 42.955,
             },
         ];
@@ -889,8 +1228,18 @@ mod tests {
             anonymize: true,
             ..HeatTuning::default()
         };
-        let svg =
-            render(&cfg, &basemap, &obf, &theme, false, false, false, tuning).expect("render");
+        let svg = render(
+            &cfg,
+            &basemap,
+            &obf,
+            &theme,
+            false,
+            false,
+            false,
+            Fit::Contain,
+            tuning,
+        )
+        .expect("render");
         assert!(
             !svg.contains("data-rider"),
             "data-rider must be stripped under --anonymize"
@@ -910,11 +1259,8 @@ mod tests {
     }
 
     /// Smoke test: load every fixture, render, and assert the SVG has
-    /// the expected layers and weight. Marked `#[ignore]` because it
-    /// parses a 33MB OSM JSON and produces a multi-MB SVG (slow under
-    /// debug). Run with `cargo test --lib -- --ignored render_smoke`.
+    /// the expected layers and weight. Needs the LFS basemap fixture.
     #[test]
-    #[ignore]
     fn render_smoke() {
         let cfg = config::load("fixtures/config.toml").expect("config loads");
         let theme = theme::load("themes/noir_heat.json").expect("theme loads");
@@ -944,6 +1290,7 @@ mod tests {
             false,
             false,
             false,
+            Fit::Contain,
             HeatTuning::default(),
         )
         .expect("render ok");
@@ -959,5 +1306,65 @@ mod tests {
         assert!(svg.len() >= 500_000, "svg too small: {} bytes", svg.len());
 
         eprintln!("render_smoke: svg size = {} bytes", svg.len());
+    }
+
+    /// cycle.dunn.dev's landing render (`--theme cycle_heat --web
+    /// --transparent-bg --anonymize --obfuscation-radius-m 1000
+    /// --cycling --heat-alpha 4.0 --fit cover`) on the fixtures, held
+    /// to the 300 KB raw target at both crops. Measured 260 KB and
+    /// 286 KB when set.
+    #[test]
+    fn web_payload_stays_in_budget() {
+        let mut cfg = config::load("fixtures/config.toml").expect("config loads");
+        let theme = theme::load_named("cycle_heat", None).expect("theme loads");
+        let mut basemap = osm::load("fixtures/grand-rapids.osm.json.gz").expect("osm loads");
+        osm::filter::refine(&mut basemap);
+        let raw = std::fs::read_to_string("fixtures/activities.json").expect("fixture");
+        let mut rides: Vec<Activity> = serde_json::from_str(&raw).expect("activities parse");
+        rides.retain(|a| {
+            matches!(
+                a.activity_type,
+                ActivityType::Ride | ActivityType::EBikeRide
+            ) && a.distance_m >= 1000.0
+        });
+        let obf = obfuscation::apply(
+            rides,
+            ObfuscationParams {
+                home_lat: cfg.home_lat,
+                home_lng: cfg.home_lng,
+                radius_m: 1000.0,
+                salt: cfg.privacy_salt.clone(),
+                offset_m: cfg.privacy_offset_m,
+            },
+        )
+        .expect("obfuscate");
+        let tuning = HeatTuning {
+            alpha: 4.0,
+            anonymize: true,
+            ..HeatTuning::default()
+        };
+        for (w, h, budget) in [(1600, 900, 300_000), (1200, 1600, 300_000)] {
+            cfg.viewbox_width = w;
+            cfg.viewbox_height = h;
+            let svg = render(
+                &cfg,
+                &basemap,
+                &obf,
+                &theme,
+                false,
+                true,
+                true,
+                Fit::Cover,
+                tuning,
+            )
+            .expect("render ok");
+            assert!(svg.contains("class=\"heat\""), "{w}x{h}: heat missing");
+            assert!(svg.contains("class=\"water\""), "{w}x{h}: water missing");
+            assert!(
+                svg.len() <= budget,
+                "{w}x{h}: {} bytes, over the {budget} byte budget",
+                svg.len()
+            );
+        }
     }
 }

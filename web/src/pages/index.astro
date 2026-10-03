@@ -65,8 +65,7 @@ import Layout from '../layouts/Layout.astro';
           Routes stop at a zone offset from home by a secret amount,
           edges trimmed. Tracks still converge toward home: an analyst
           can narrow it to roughly 100-250 m; a larger radius adds only
-          modest cover. Segment names stripped, athlete and gear IDs
-          zeroed in the bundled fixture.
+          modest cover. The bundled fixture is fully synthetic.
         </p>
         <p class="tile-meta">circle-obfuscate · 1km+ default</p>
       </div>
@@ -207,12 +206,9 @@ import Layout from '../layouts/Layout.astro';
   <section>
     <h2 class="section-title">Provenance</h2>
     <p class="section-prose">
-      The plate above is the bundled <code>fixtures/activities.json</code>,
-      sourced from public Strava cycling and running segments for
-      Grand Rapids — not any rider's personal activity. Athlete IDs
-      are zeroed, gear IDs are placeholders, segment names are
-      generic identifiers. The repo ships zero real-rider data and
-      zero maintainer-attributable coordinates. The same applies to
+      The plate above is the bundled <code>fixtures/activities.json</code>:
+      seeded random walks over the Grand Rapids road graph, fully
+      synthetic. The repo ships zero real-rider data. The same applies to
       anything you render: only the operator's own Strava activities
       are touched, only on the operator's own machine.
     </p>

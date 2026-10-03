@@ -2,10 +2,12 @@
 
 ## Build prerequisites
 
-- Rust toolchain pinned in `rust-toolchain.toml` (1.94 at the time of
-  v0.1). `rustup` reads that file on first build.
-- `librsvg`'s `rsvg-convert` and ImageMagick's `magick` are required
-  for `make example` and `make site`. The crate itself doesn't need
+- Rust toolchain pinned in `rust-toolchain.toml`; `rustup` reads that
+  file on first build.
+- `git-lfs`: run `git lfs install` once; a clone pulls the OSM fixture
+  through LFS.
+- `just` (pinned in `mise.toml`), `librsvg`'s `rsvg-convert` and ImageMagick's `magick` are
+  required for the `just` recipes. The crate itself doesn't need
   them.
 - macOS / Linux are tested. Windows is supported in code but not
   exercised by CI.
@@ -13,15 +15,12 @@
 ## Day-to-day commands
 
 ```bash
-make release        # build optimized binary at target/release/patinate
-make example        # rebuild the README hero gallery (3 themes)
-make site           # build public/ for local preview of the demo page
-make clean          # remove generated example + site artifacts
+just               # list recipes: all, release, example, themes, site, web,
+                   # check-pixels, clean
 
 cargo fmt
 cargo clippy --all-targets -- -D warnings
 cargo test --lib
-cargo test --lib -- --ignored render_smoke   # heavy fixture-based
 ```
 
 ## Test layout
@@ -92,9 +91,6 @@ activities fixture, mirror the pattern in
 Use `osm::load("fixtures/grand-rapids.osm.json.gz")` to get the
 gzipped basemap; the loader transparently decompresses.
 
-If the test depends on the 35 MB raw JSON expansion, mark it
-`#[ignore]` so default runs stay fast.
-
 ## Reproducing visual changes
 
 The visual tuning loop is:
@@ -131,5 +127,5 @@ clarity.
 
 ## Releasing
 
-Tag releases on `main` after CI is green. The pipeline auto-deploys
-the demo site to GitLab Pages on every `main` push.
+Tag releases on `main` after CI is green. The pipeline deploys
+patinate.dunn.dev (`web/`) as a Cloudflare Worker on every `main` push.
