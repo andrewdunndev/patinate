@@ -12,11 +12,9 @@ accumulate into brighter color the way actual patina builds on metal.
 
 ![Grand Rapids, three themes: noir_heat, blueprint_heat, warm_beige](assets/example-gallery.png)
 
-The gallery above is the bundled `fixtures/activities.json`, sourced from
-public Strava cycling and running segments for Grand Rapids. Athlete
-IDs are zeroed, gear IDs are placeholders, segment names are generic
-identifiers. The repo ships zero real-rider data and zero
-maintainer-attributable coordinates.
+The gallery above is the bundled `fixtures/activities.json`: seeded
+random walks over the Grand Rapids road graph, fully synthetic. The
+repo ships zero real-rider data.
 
 ## Quickstart
 
