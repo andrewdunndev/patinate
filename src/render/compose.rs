@@ -508,7 +508,7 @@ fn tier_class(tier: RoadTier) -> &'static str {
     }
 }
 
-/// Build the heat group: the ride paths once under `#heat-paths`, then
+/// Build the heat group: the ride paths once under a per-render `#heat-<hash>` id, then
 /// three `<use>` layers of it for the painterly glow stack:
 ///   outer halo (`heat.glow_outer_ratio` x width, `heat.glow_outer_alpha`)
 ///   inner halo (`heat.glow_inner_ratio` x width, `heat.glow_inner_alpha`)
@@ -617,11 +617,30 @@ fn build_heat(
         ]
     };
 
-    // The ride paths are written once, bare, under `#heat-paths`; each
+    // The ride paths are written once, bare, under that id; each
     // layer is a `<use>` whose stroke, width and opacity the clone
     // inherits. A path that set any of those itself would pin every
     // layer to one value, so paths carry only `d` and data attrs.
-    let mut paths = Group::new().set("id", "heat-paths").set("class", "heat");
+    //
+    // The id derives from the theme and the path data (which already
+    // encodes the viewbox), so two renders inlined into one page never
+    // share a `<use>` target.
+    let heat_id = {
+        use sha2::{Digest, Sha256};
+        let mut h = Sha256::new();
+        h.update(theme.name.as_bytes());
+        h.update(proj.scale_per_meter().to_bits().to_le_bytes());
+        for (_, d) in &decoded {
+            h.update([0]);
+            h.update(d.as_bytes());
+        }
+        let digest = h.finalize();
+        format!(
+            "heat-{:02x}{:02x}{:02x}{:02x}",
+            digest[0], digest[1], digest[2], digest[3]
+        )
+    };
+    let mut paths = Group::new().set("id", heat_id.clone()).set("class", "heat");
     for (obf, d) in &decoded {
         let act = obf.activity();
         let mut p = Path::new().set("d", d.clone());
@@ -648,7 +667,7 @@ fn build_heat(
         .add(Definitions::new().add(paths));
     for (class, width, alpha) in layers {
         let mut u = Use::new()
-            .set("href", "#heat-paths")
+            .set("href", format!("#{heat_id}"))
             .set("class", class)
             .set("stroke-width", width)
             .set("stroke-opacity", alpha);
@@ -935,10 +954,17 @@ mod tests {
         assert_eq!(water_lines(true).matches('M').count(), 1, "web");
     }
 
-    /// The SVG between the `#heat-paths` group's open and close tags.
+    /// The `heat-<8 hex>` id of the ride-path group.
+    fn heat_id(svg: &str) -> &str {
+        let open = "<g class=\"heat\" id=\"";
+        let at = svg.find(open).expect("heat-paths group") + open.len();
+        &svg[at..at + "heat-".len() + 8]
+    }
+
+    /// The SVG between the heat path group's open and close tags.
     fn heat_paths_inner(svg: &str) -> &str {
-        let open = "<g class=\"heat\" id=\"heat-paths\">";
-        let start = svg.find(open).expect("heat-paths group") + open.len();
+        let open = format!("<g class=\"heat\" id=\"{}\">", heat_id(svg));
+        let start = svg.find(&open).expect("heat-paths group") + open.len();
         let end = start + svg[start..].find("</g>").expect("group close");
         &svg[start..end]
     }
@@ -1063,7 +1089,16 @@ mod tests {
                 assert!(!inner.contains(attr), "a heat path sets {attr}: {inner}");
             }
             assert_eq!(svg.matches("<use ").count(), 3);
+            let id = heat_id(&svg);
+            assert_eq!(svg.matches(&format!("href=\"#{id}\"")).count(), 3);
         }
+    }
+
+    #[test]
+    fn heat_id_differs_per_render() {
+        let (poster, web) = (small_heat_render(false), small_heat_render(true));
+        assert_ne!(heat_id(&poster), heat_id(&web));
+        assert_eq!(heat_id(&poster), heat_id(&small_heat_render(false)));
     }
 
     /// Rasterizes the use-stack render and the same render with every
@@ -1075,15 +1110,16 @@ mod tests {
     fn use_stack_matches_inlined_layers_in_pixels() {
         let svg = small_heat_render(false);
         let inner = heat_paths_inner(&svg).to_string();
+        let id = heat_id(&svg).to_string();
         let defs_start = svg.find("<defs>\n<g class=\"heat\"").expect("heat defs");
         let defs_end = defs_start + svg[defs_start..].find("</defs>").unwrap() + "</defs>".len();
         let mut inlined = format!("{}{}", &svg[..defs_start], &svg[defs_end..]);
         while let Some(at) = inlined.find("<use ") {
             let end = at + inlined[at..].find("/>").unwrap();
-            let attrs = inlined[at + 5..end].replace("href=\"#heat-paths\" ", "");
+            let attrs = inlined[at + 5..end].replace(&format!("href=\"#{id}\" "), "");
             inlined.replace_range(at..end + 2, &format!("<g {attrs}>{inner}</g>"));
         }
-        assert!(!inlined.contains("heat-paths"));
+        assert!(!inlined.contains(&id));
 
         let dir = std::env::temp_dir().join(format!("patinate-pixels-{}", std::process::id()));
         std::fs::create_dir_all(&dir).unwrap();
