@@ -23,6 +23,7 @@ use crate::cache::{self, queries::StoredTokens};
 use crate::config::{self, ValidatedConfig};
 use crate::obfuscation::{self, ObfuscationParams};
 use crate::osm;
+use crate::render::projection::Fit;
 use crate::render::{compose, theme};
 use crate::strava::{self, Activity, auth::AuthClient, client::StravaClient};
 
@@ -206,6 +207,13 @@ struct RenderArgs {
     /// Override viewbox height.
     #[arg(long)]
     viewbox_height: Option<u32>,
+
+    /// How the radius circle meets a viewbox of another aspect:
+    /// `contain` letterboxes so the whole circle shows, `cover` fills
+    /// the viewbox and crops the long axis. The frame comes from the
+    /// config's center and radius only, never from the rides.
+    #[arg(long, value_enum, default_value_t = Fit::Contain)]
+    fit: Fit,
 
     /// Render only this single Strava activity ID (single-ride poster).
     #[arg(long)]
@@ -447,10 +455,16 @@ fn render_cmd(args: RenderArgs) -> Result<()> {
             "obfuscation radius overridden via --obfuscation-radius-m"
         );
     }
-    let obfuscated = obfuscation::apply(
-        activities,
-        obfuscation_params(&cfg, args.obfuscation_radius_m),
-    )?;
+    let privacy = obfuscation_params(&cfg, args.obfuscation_radius_m);
+    if args.anonymize && obfuscation::center_near_home(&privacy, cfg.center_lat, cfg.center_lng) {
+        // Never name either point: the warning may land in a CI log.
+        tracing::warn!(
+            "the map center lies within the obfuscation radius plus the \
+             privacy offset of home, so a published frame centers near \
+             home; move [general] center elsewhere before publishing"
+        );
+    }
+    let obfuscated = obfuscation::apply(activities, privacy)?;
     tracing::info!(kept = obfuscated.len(), "after obfuscation");
 
     // `--web` semantics (lighter glow, precision-1 coords, dropped
@@ -464,6 +478,7 @@ fn render_cmd(args: RenderArgs) -> Result<()> {
         args.heat_only,
         args.web,
         args.transparent_bg,
+        args.fit,
         compose::HeatTuning {
             bloom: args.heat_bloom,
             alpha: args.heat_alpha,

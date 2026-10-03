@@ -16,7 +16,7 @@ use svg::node::element::{
 use crate::config::ValidatedConfig;
 use crate::obfuscation::ObfuscatedActivity;
 use crate::osm::{Basemap, LatLon};
-use crate::render::projection::Projection;
+use crate::render::projection::{Fit, Projection};
 use crate::render::theme::{HeatBlend, RoadTier, Theme};
 use crate::render::typography;
 
@@ -57,6 +57,8 @@ impl Default for HeatTuning {
 ///   own typography. Targets a small inline SVG for a consumer page.
 /// - `transparent_bg`: skip the bg rect so the SVG paints over the
 ///   consumer page's own background. Combine with `web` for inline.
+/// - `fit`: letterbox (`Contain`) or crop (`Cover`) the radius circle
+///   into the viewbox.
 /// - `tuning`: runtime knobs that scale the theme's bloom and core
 ///   alpha. See `HeatTuning` for semantics.
 #[allow(clippy::too_many_arguments)]
@@ -68,6 +70,7 @@ pub fn render(
     heat_only: bool,
     web: bool,
     transparent_bg: bool,
+    fit: Fit,
     tuning: HeatTuning,
 ) -> Result<String> {
     let viewbox_w = config.viewbox_width as f64;
@@ -79,6 +82,7 @@ pub fn render(
         config.radius_m,
         config.viewbox_width,
         config.viewbox_height,
+        fit,
     )?;
 
     // Defs: fade gradients.
@@ -765,6 +769,7 @@ mod tests {
             false,
             false,
             false,
+            Fit::Contain,
             HeatTuning::default(),
         )
         .expect("render ok");
@@ -792,6 +797,7 @@ mod tests {
             false,
             true,
             true,
+            Fit::Contain,
             HeatTuning::default(),
         )
         .expect("render web");
@@ -882,9 +888,57 @@ mod tests {
             true,
             web,
             false,
+            Fit::Contain,
             tuning,
         )
         .expect("render ok")
+    }
+
+    #[test]
+    fn frame_ignores_activities_and_home() {
+        // Rides cluster around home, so a frame fitted to them would
+        // point at it. Everything drawn before the heat (viewBox,
+        // basemap) must come out the same whatever the rides and home.
+        let cfg = config::load("fixtures/config.toml").expect("config loads");
+        let theme = theme::load_named("cycle_heat", None).expect("theme loads");
+        let basemap = osm::load("fixtures/grand-rapids.osm.json.gz").expect("osm loads");
+        let raw = std::fs::read_to_string("fixtures/activities.json").expect("fixture");
+        let rides: Vec<Activity> = serde_json::from_str(&raw).expect("activities parse");
+        let frame = |cfg: &ValidatedConfig, rides: Vec<Activity>| -> String {
+            let obf = obfuscation::apply(
+                rides,
+                ObfuscationParams {
+                    home_lat: cfg.home_lat,
+                    home_lng: cfg.home_lng,
+                    radius_m: 0.0,
+                    salt: None,
+                    offset_m: 750.0,
+                },
+            )
+            .expect("obfuscate");
+            let svg = render(
+                cfg,
+                &basemap,
+                &obf,
+                &theme,
+                false,
+                true,
+                true,
+                Fit::Cover,
+                HeatTuning::default(),
+            )
+            .expect("render ok");
+            svg[..svg.find("<g class=\"heat-stack\"").expect("heat")].to_string()
+        };
+        let base = frame(&cfg, rides.clone());
+        assert!(base.contains("class=\"roads\""), "basemap must draw");
+
+        let mut moved = cfg.clone();
+        moved.home_lat += 0.2;
+        moved.home_lng -= 0.3;
+        let east: Vec<Activity> = rides[..rides.len() / 4].to_vec();
+        assert_eq!(frame(&moved, Vec::new()), base, "no rides, home moved");
+        assert_eq!(frame(&cfg, east), base, "a quarter of the rides");
     }
 
     #[test]
@@ -983,6 +1037,7 @@ mod tests {
                 false,
                 false,
                 false,
+                Fit::Contain,
                 tuning,
             )
             .expect("render ok");
@@ -1025,8 +1080,18 @@ mod tests {
             anonymize: true,
             ..HeatTuning::default()
         };
-        let svg =
-            render(&cfg, &basemap, &obf, &theme, false, false, false, tuning).expect("render");
+        let svg = render(
+            &cfg,
+            &basemap,
+            &obf,
+            &theme,
+            false,
+            false,
+            false,
+            Fit::Contain,
+            tuning,
+        )
+        .expect("render");
         assert!(
             !svg.contains("data-rider"),
             "data-rider must be stripped under --anonymize"
@@ -1077,6 +1142,7 @@ mod tests {
             false,
             false,
             false,
+            Fit::Contain,
             HeatTuning::default(),
         )
         .expect("render ok");

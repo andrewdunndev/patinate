@@ -516,6 +516,13 @@ fn closest_t(a: (f64, f64), b: (f64, f64), center: (f64, f64)) -> f64 {
     0.5 * (lo + hi)
 }
 
+/// True when `(lat, lng)` lies within the obfuscation radius plus the
+/// privacy offset of home: the region the hidden zone can occupy. A
+/// published map centered there points at home whatever the clip does.
+pub fn center_near_home(params: &ObfuscationParams, lat: f64, lng: f64) -> bool {
+    haversine_m(params.home_lat, params.home_lng, lat, lng) < params.radius_m + params.offset_m
+}
+
 /// Great-circle distance in meters between two lat/lng points.
 fn haversine_m(lat1: f64, lng1: f64, lat2: f64, lng2: f64) -> f64 {
     const R: f64 = 6_371_000.0;
@@ -532,6 +539,21 @@ mod tests {
     use super::*;
     use chrono::Utc;
     use geo_types::{Coord, LineString};
+
+    #[test]
+    fn center_near_home_covers_radius_plus_offset() {
+        let params = ObfuscationParams {
+            home_lat: 42.96,
+            home_lng: -85.67,
+            radius_m: 1000.0,
+            offset_m: 750.0,
+            salt: None,
+        };
+        // ~1.11 km north per 0.01 degree of latitude.
+        assert!(center_near_home(&params, 42.96, -85.67));
+        assert!(center_near_home(&params, 42.975, -85.67), "1.67 km out");
+        assert!(!center_near_home(&params, 42.98, -85.67), "2.2 km out");
+    }
 
     fn act(lat: f64, lng: f64) -> Activity {
         Activity {
