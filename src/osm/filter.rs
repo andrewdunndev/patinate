@@ -139,7 +139,9 @@ pub fn keep_largest_components(basemap: &mut Basemap, n: usize) {
         *sizes.entry(uf.find(i)).or_insert(0) += 1;
     }
     let mut ranked: Vec<(usize, usize)> = sizes.into_iter().collect();
-    ranked.sort_by_key(|&(_, size)| std::cmp::Reverse(size));
+    // Tie-break on the root so equal-sized components rank the same
+    // way every run; HashMap order would make renders non-deterministic.
+    ranked.sort_by_key(|&(root, size)| (std::cmp::Reverse(size), root));
     let kept_roots: std::collections::HashSet<usize> =
         ranked.into_iter().take(n).map(|(root, _)| root).collect();
 
@@ -273,6 +275,28 @@ mod tests {
         ));
         min_way_length(&mut bm);
         assert_eq!(bm.roads.len(), 1, "expected the longer way to survive");
+    }
+
+    #[test]
+    fn keep_largest_components_breaks_ties_deterministically() {
+        // Twenty equal-sized orphans and room for five: which five
+        // survive must not depend on HashMap iteration order.
+        let mut bm = Basemap::default();
+        for i in 0..20 {
+            let lat = 43.0 + i as f64 * 0.01;
+            bm.roads
+                .push(road(RoadTier::Residential, &[(lat, -85.5), (lat, -85.49)]));
+        }
+        let survivors = |bm: &Basemap| -> Vec<f64> {
+            let mut b = bm.clone();
+            keep_largest_components(&mut b, 5);
+            b.roads.iter().map(|r| r.geometry[0].lat).collect()
+        };
+        let first = survivors(&bm);
+        assert_eq!(first.len(), 5);
+        for _ in 0..10 {
+            assert_eq!(survivors(&bm), first);
+        }
     }
 
     #[test]
