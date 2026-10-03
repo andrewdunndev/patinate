@@ -457,8 +457,9 @@ fn render_cmd(args: RenderArgs) -> Result<()> {
             home_lat: cfg.home_lat,
             home_lng: cfg.home_lng,
             radius_m: obfuscation_radius_m,
+            salt: cfg.privacy_salt.clone(),
         },
-    );
+    )?;
     tracing::info!(kept = obfuscated.len(), "after obfuscation");
 
     // `--web` semantics (single-layer heat, precision-1 coords, dropped

@@ -4,23 +4,97 @@
 // renderer accepts; raw `Activity` cannot reach the render layer
 // without passing through `apply()`. The constructor is the gate.
 //
-// v0.1: real polyline-circle clipping. Every input polyline is decoded,
-// walked segment by segment, and split at the obfuscation circle's
-// edge. Inside-circle portions are dropped. The renderer consumes the
-// resulting outside-only segment list directly via `segments()`; it
-// never sees the raw `summary_polyline` for activities that came
-// through `apply()` with a positive radius. Activities whose entire
-// trace falls inside the circle are dropped.
+// Every polyline is decoded, clipped against a hidden zone, and the
+// inside portions dropped; the renderer consumes the outside-only
+// segment list via `segments()` and never sees `summary_polyline`.
+//
+// The hidden zone is not the home circle. Clipping at one exact circle
+// on home puts every cut endpoint on that circle, and a circle fit over
+// the render recovers home to metres. Instead, with `r` the configured
+// radius and a secret salt:
+//   - the zone's centre sits a secret 0.6r..0.8r from home in a secret
+//     direction, and its radius is r plus that offset, so the disk of
+//     radius r around home stays inside it;
+//   - each cut end is then trimmed a further 0..r along the track, an
+//     amount seeded by salt + activity id + crossing index, so the cut
+//     endpoints scatter over a band instead of lying on a circle.
+// A fit lands on the zone's centre, never on home. All randomness comes
+// from SHA-256 over the salt, so repeated renders are identical and
+// cannot be averaged against each other.
 
+use std::fmt;
+
+use anyhow::{Result, anyhow, bail};
 use geo::LineString;
+use sha2::{Digest, Sha256};
 
 use crate::strava::Activity;
 
-#[derive(Debug, Clone, Copy)]
+/// Shown when a positive radius is requested without a salt. Loud by
+/// design: the only salt-free fallback is the exact home circle.
+pub const MISSING_SALT: &str = "\
+[privacy].obfuscation_radius_m > 0 needs [privacy].salt, a private random \
+string that decides where the hidden zone around home sits. Without it the \
+zone would be an exact circle on home, which a circle fit over the render \
+recovers to a few metres. Add to ~/.config/patinate/config.toml (never a \
+public repo):
+
+  [privacy]
+  salt = \"<output of: openssl rand -hex 16>\"
+
+or set PATINATE_PRIVACY__SALT. Keep it stable: a new salt moves the zone, and \
+two renders with different salts narrow down home.";
+
+/// Operator secret seeding the hidden zone. Never rendered, never logged.
+#[derive(Clone)]
+pub struct PrivacySalt(Vec<u8>);
+
+impl PrivacySalt {
+    pub const MIN_LEN: usize = 16;
+
+    pub fn new(s: &str) -> Result<Self> {
+        let s = s.trim();
+        if s.len() < Self::MIN_LEN {
+            bail!(
+                "[privacy].salt is {} characters; use at least {}. \
+                 Generate one with: openssl rand -hex 16",
+                s.len(),
+                Self::MIN_LEN
+            );
+        }
+        Ok(Self(s.as_bytes().to_vec()))
+    }
+
+    /// Keyed PRF: a uniform `f64` in [0, 1) for `(domain, words)`.
+    fn unit(&self, domain: &[u8], words: &[u64]) -> f64 {
+        let mut h = Sha256::new();
+        h.update((self.0.len() as u64).to_le_bytes());
+        h.update(&self.0);
+        h.update((domain.len() as u64).to_le_bytes());
+        h.update(domain);
+        for w in words {
+            h.update(w.to_le_bytes());
+        }
+        let d = h.finalize();
+        let mut b = [0u8; 8];
+        b.copy_from_slice(&d[..8]);
+        (u64::from_le_bytes(b) >> 11) as f64 / (1u64 << 53) as f64
+    }
+}
+
+impl fmt::Debug for PrivacySalt {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("PrivacySalt(<redacted>)")
+    }
+}
+
+#[derive(Debug, Clone)]
 pub struct ObfuscationParams {
     pub home_lat: f64,
     pub home_lng: f64,
     pub radius_m: f64,
+    /// Required when `radius_m > 0`; `apply()` refuses to run without it.
+    pub salt: Option<PrivacySalt>,
 }
 
 /// An activity that has passed obfuscation. Carries the wrapped
@@ -39,7 +113,7 @@ impl ObfuscatedActivity {
         &self.activity
     }
 
-    /// Outside-circle polyline pieces. Each inner `Vec` is one
+    /// Outside-zone polyline pieces. Each inner `Vec` is one
     /// continuous run of `(lat, lng)` points that the renderer should
     /// stroke as a single sub-path.
     pub fn segments(&self) -> &[Vec<(f64, f64)>] {
@@ -47,36 +121,84 @@ impl ObfuscatedActivity {
     }
 }
 
+/// The region removed from every render: a disk that contains the
+/// home disk but is not centred on it, plus per-crossing trims.
+struct HiddenZone<'a> {
+    center: (f64, f64),
+    radius_m: f64,
+    max_trim_m: f64,
+    radius_bits: u64,
+    salt: &'a PrivacySalt,
+}
+
+impl<'a> HiddenZone<'a> {
+    fn derive(params: &ObfuscationParams, salt: &'a PrivacySalt) -> Self {
+        let r = params.radius_m;
+        // The radius is part of the seed: renders at two radii get
+        // unrelated offsets, so their centres don't line up on home.
+        let radius_bits = r.to_bits();
+        let theta = std::f64::consts::TAU * salt.unit(b"zone-direction", &[radius_bits]);
+        let offset_m = r * (0.6 + 0.2 * salt.unit(b"zone-offset", &[radius_bits]));
+        let (hlat, hlng) = (params.home_lat, params.home_lng);
+        const EARTH_R: f64 = 6_371_000.0;
+        let center = (
+            hlat + (offset_m * theta.cos() / EARTH_R).to_degrees(),
+            hlng + (offset_m * theta.sin() / (EARTH_R * hlat.to_radians().cos())).to_degrees(),
+        );
+        // Measured, not nominal, offset, plus 1 m for bisection slack:
+        // every point within r of home is inside this disk.
+        let radius_m = r + haversine_m(hlat, hlng, center.0, center.1) + 1.0;
+        Self {
+            center,
+            radius_m,
+            max_trim_m: r,
+            radius_bits,
+            salt,
+        }
+    }
+
+    fn contains(&self, lat: f64, lng: f64) -> bool {
+        haversine_m(lat, lng, self.center.0, self.center.1) <= self.radius_m
+    }
+
+    fn trim_m(&self, activity_id: i64, crossing: u64) -> f64 {
+        self.max_trim_m
+            * self.salt.unit(
+                b"crossing-trim",
+                &[self.radius_bits, activity_id as u64, crossing],
+            )
+    }
+}
+
 /// Apply obfuscation to a slice of activities. Each polyline is
-/// clipped against the circle of radius `params.radius_m` centered on
-/// `(home_lat, home_lng)`; inside-circle portions are removed.
-/// Activities whose polyline lies entirely inside the circle (or that
-/// have no polyline at all and start within the circle) are dropped.
-/// Pass `radius_m = 0.0` to disable clipping; in that case the full
-/// decoded polyline is preserved as a single segment.
+/// clipped against the hidden zone (see the module comment); inside
+/// portions are removed and every cut end is trimmed further along
+/// the track. Activities with nothing left outside the zone (or with
+/// no polyline and a start inside it) are dropped. `radius_m = 0.0`
+/// disables clipping and keeps the full decoded polyline as one
+/// segment. A positive radius without a salt is an error.
 pub fn apply(
     activities: impl IntoIterator<Item = Activity>,
     params: ObfuscationParams,
-) -> Vec<ObfuscatedActivity> {
-    activities
+) -> Result<Vec<ObfuscatedActivity>> {
+    let zone = if params.radius_m > 0.0 {
+        let salt = params.salt.as_ref().ok_or_else(|| anyhow!(MISSING_SALT))?;
+        Some(HiddenZone::derive(&params, salt))
+    } else {
+        None
+    };
+    Ok(activities
         .into_iter()
-        .filter_map(|a| build_obfuscated(a, &params))
-        .collect()
+        .filter_map(|a| build_obfuscated(a, zone.as_ref()))
+        .collect())
 }
 
-fn build_obfuscated(activity: Activity, params: &ObfuscationParams) -> Option<ObfuscatedActivity> {
+fn build_obfuscated(activity: Activity, zone: Option<&HiddenZone>) -> Option<ObfuscatedActivity> {
     // No polyline: fall back to start-point distance. A polyline-less
     // activity can't be split, so the only honest behavior is to drop
-    // it when it starts inside the circle.
+    // it when it starts inside the zone.
     if activity.summary_polyline.is_empty() {
-        if params.radius_m > 0.0
-            && haversine_m(
-                activity.start_lat,
-                activity.start_lng,
-                params.home_lat,
-                params.home_lng,
-            ) <= params.radius_m
-        {
+        if zone.is_some_and(|z| z.contains(activity.start_lat, activity.start_lng)) {
             return None;
         }
         return Some(ObfuscatedActivity {
@@ -92,15 +214,16 @@ fn build_obfuscated(activity: Activity, params: &ObfuscationParams) -> Option<Ob
         Err(_) => return None,
     };
 
-    let segments = if params.radius_m <= 0.0 {
-        // Obfuscation disabled: emit the full polyline as one segment.
-        let pts: Vec<(f64, f64)> = line.0.iter().map(|c| (c.y, c.x)).collect();
-        if pts.len() < 2 {
-            return None;
+    let segments = match zone {
+        None => {
+            // Obfuscation disabled: emit the full polyline as one segment.
+            let pts: Vec<(f64, f64)> = line.0.iter().map(|c| (c.y, c.x)).collect();
+            if pts.len() < 2 {
+                return None;
+            }
+            vec![pts]
         }
-        vec![pts]
-    } else {
-        clip_to_outside_circle(&line, (params.home_lat, params.home_lng), params.radius_m)
+        Some(z) => clip_and_trim(&line, z, activity.id),
     };
 
     if segments.is_empty() {
@@ -110,6 +233,68 @@ fn build_obfuscated(activity: Activity, params: &ObfuscationParams) -> Option<Ob
         activity,
         clipped_segments: segments,
     })
+}
+
+/// Clip against the zone's disk, then trim each cut end (not the
+/// activity's own start or finish) a seeded distance along the run.
+/// Runs too short to survive their trims are dropped.
+fn clip_and_trim(
+    line: &LineString<f64>,
+    zone: &HiddenZone,
+    activity_id: i64,
+) -> Vec<Vec<(f64, f64)>> {
+    let runs = clip_to_outside_circle(line, zone.center, zone.radius_m);
+    let starts_outside = line.0.first().is_some_and(|c| !zone.contains(c.y, c.x));
+    let ends_outside = line.0.last().is_some_and(|c| !zone.contains(c.y, c.x));
+    let last = runs.len().saturating_sub(1);
+    let mut crossing = 0u64;
+    let mut next_trim = || {
+        let t = zone.trim_m(activity_id, crossing);
+        crossing += 1;
+        t
+    };
+    let mut out = Vec::with_capacity(runs.len());
+    for (i, mut run) in runs.into_iter().enumerate() {
+        if !(i == 0 && starts_outside) {
+            match trim_front(&run, next_trim()) {
+                Some(r) => run = r,
+                None => continue,
+            }
+        }
+        if !(i == last && ends_outside) {
+            run.reverse();
+            match trim_front(&run, next_trim()) {
+                Some(r) => run = r,
+                None => continue,
+            }
+            run.reverse();
+        }
+        out.push(run);
+    }
+    out
+}
+
+/// Drop the first `trim_m` metres of a run, interpolating the new
+/// first point. `None` when the run is not longer than `trim_m`.
+fn trim_front(run: &[(f64, f64)], trim_m: f64) -> Option<Vec<(f64, f64)>> {
+    let mut walked = 0.0;
+    for j in 0..run.len().saturating_sub(1) {
+        let (a, b) = (run[j], run[j + 1]);
+        let seg = haversine_m(a.0, a.1, b.0, b.1);
+        if walked + seg > trim_m {
+            let t = if seg > 0.0 {
+                (trim_m - walked) / seg
+            } else {
+                0.0
+            };
+            let mut out = Vec::with_capacity(run.len() - j);
+            out.push(lerp(a, b, t));
+            out.extend_from_slice(&run[j + 1..]);
+            return Some(out);
+        }
+        walked += seg;
+    }
+    None
 }
 
 /// Clip a polyline against a circle, keeping only the portions that
@@ -363,8 +548,10 @@ mod tests {
                 home_lat: 42.96,
                 home_lng: -85.622,
                 radius_m: 250.0,
+                salt: Some(salt()),
             },
-        );
+        )
+        .expect("obfuscate");
         assert_eq!(kept.len(), 1);
         assert!((kept[0].activity().start_lat - 42.94).abs() < 1e-6);
     }
@@ -377,8 +564,10 @@ mod tests {
                 home_lat: 42.96,
                 home_lng: -85.622,
                 radius_m: 0.0,
+                salt: None,
             },
-        );
+        )
+        .expect("obfuscate");
         assert_eq!(kept.len(), 1);
     }
 
@@ -480,8 +669,10 @@ mod tests {
                 home_lat: home.0,
                 home_lng: home.1,
                 radius_m: radius,
+                salt: Some(salt()),
             },
-        );
+        )
+        .expect("obfuscate");
         assert_eq!(kept.len(), 1, "ride that exits the circle must be kept");
         // No point in any kept segment may sit inside the home circle.
         // Boundary points (within sub-meter) are the bisection output
@@ -536,5 +727,288 @@ mod tests {
         assert!((d_out - radius).abs() < 1.0);
         assert!((segs[1][1].0 - b.0).abs() < 1e-9);
         assert!((segs[1][1].1 - b.1).abs() < 1e-9);
+    }
+
+    // ---- hidden-zone tests: synthetic data only ----
+
+    const HOME: (f64, f64) = (42.96, -85.622);
+    const EARTH_R: f64 = 6_371_000.0;
+
+    fn salt() -> PrivacySalt {
+        PrivacySalt::new("test-salt-not-a-secret").expect("salt")
+    }
+
+    fn salt_n(i: u64) -> PrivacySalt {
+        PrivacySalt::new(&format!("synthetic-test-salt-{i:04}")).expect("salt")
+    }
+
+    fn params(radius_m: f64, salt: PrivacySalt) -> ObfuscationParams {
+        ObfuscationParams {
+            home_lat: HOME.0,
+            home_lng: HOME.1,
+            radius_m,
+            salt: Some(salt),
+        }
+    }
+
+    /// Local metres (east, north) from HOME to (lat, lng).
+    fn to_latlng(e: f64, n: f64) -> (f64, f64) {
+        (
+            HOME.0 + (n / EARTH_R).to_degrees(),
+            HOME.1 + (e / (EARTH_R * HOME.0.to_radians().cos())).to_degrees(),
+        )
+    }
+
+    fn to_local(p: (f64, f64)) -> (f64, f64) {
+        (
+            (p.1 - HOME.1).to_radians() * EARTH_R * HOME.0.to_radians().cos(),
+            (p.0 - HOME.0).to_radians() * EARTH_R,
+        )
+    }
+
+    /// Tiny deterministic LCG so the synthetic set needs no RNG crate.
+    struct Lcg(u64);
+    impl Lcg {
+        fn next(&mut self) -> f64 {
+            self.0 = self
+                .0
+                .wrapping_mul(6_364_136_223_846_793_005)
+                .wrapping_add(1_442_695_040_888_963_407);
+            (self.0 >> 11) as f64 / (1u64 << 53) as f64
+        }
+    }
+
+    fn activity_from(id: i64, pts: &[(f64, f64)]) -> Activity {
+        let mut a = act(pts[0].0, pts[0].1);
+        a.id = id;
+        a.summary_polyline =
+            polyline::encode_coordinates(pts.iter().map(|&(lat, lng)| Coord { x: lng, y: lat }), 5)
+                .expect("encode polyline");
+        a
+    }
+
+    /// `n` activities radiating from home: most leave from near the
+    /// door and head out 4r..10r; every fourth is a through route that
+    /// passes within 0.3r of home. Returns the decoded natural
+    /// endpoints alongside, so tests can pick out the cut ends.
+    fn radiating(n: usize, r: f64) -> Vec<Activity> {
+        let mut rng = Lcg(0x5eed);
+        let mut out = Vec::new();
+        for k in 0..n {
+            let theta = std::f64::consts::TAU * (k as f64 + rng.next()) / n as f64;
+            let len = r * (4.0 + 6.0 * rng.next());
+            let (c, s) = (theta.cos(), theta.sin());
+            let mut pts = Vec::new();
+            if k % 4 == 3 {
+                // Through route: far side, past home, out the other way.
+                let miss = r * 0.3 * (rng.next() - 0.5);
+                let steps = 60;
+                for i in 0..=steps {
+                    let t = -len + 2.0 * len * i as f64 / steps as f64;
+                    pts.push(to_latlng(t * c - miss * s, t * s + miss * c));
+                }
+            } else {
+                let start = r * 0.3 * rng.next();
+                let steps = (len / (r / 3.0)) as usize;
+                for i in 0..=steps {
+                    let t = start + (len - start) * i as f64 / steps as f64;
+                    let wiggle = r * 0.05 * (rng.next() - 0.5);
+                    pts.push(to_latlng(t * c - wiggle * s, t * s + wiggle * c));
+                }
+            }
+            out.push(activity_from(1000 + k as i64, &pts));
+        }
+        out
+    }
+
+    /// Segment endpoints that are not an activity's own start or
+    /// finish: exactly what the clip and trim produced.
+    fn cut_endpoints(kept: &[ObfuscatedActivity]) -> Vec<(f64, f64)> {
+        let mut pts = Vec::new();
+        for ob in kept {
+            let line = polyline::decode_polyline(&ob.activity().summary_polyline, 5).unwrap();
+            let first = (line.0[0].y, line.0[0].x);
+            let last = (line.0[line.0.len() - 1].y, line.0[line.0.len() - 1].x);
+            for seg in ob.segments() {
+                for p in [seg[0], seg[seg.len() - 1]] {
+                    if p != first && p != last {
+                        pts.push(to_local(p));
+                    }
+                }
+            }
+        }
+        pts
+    }
+
+    /// Algebraic (Kasa) least-squares circle fit: (cx, cy, radius).
+    fn lsq_circle(pts: &[(f64, f64)]) -> (f64, f64, f64) {
+        let (mut sxx, mut sxy, mut syy, mut sx, mut sy) = (0.0, 0.0, 0.0, 0.0, 0.0);
+        let (mut sxz, mut syz, mut sz) = (0.0, 0.0, 0.0);
+        let n = pts.len() as f64;
+        for &(x, y) in pts {
+            let z = x * x + y * y;
+            sxx += x * x;
+            sxy += x * y;
+            syy += y * y;
+            sx += x;
+            sy += y;
+            sxz += x * z;
+            syz += y * z;
+            sz += z;
+        }
+        // Solve [sxx sxy sx; sxy syy sy; sx sy n] [a b c] = -[sxz syz sz].
+        let m = [[sxx, sxy, sx], [sxy, syy, sy], [sx, sy, n]];
+        let rhs = [-sxz, -syz, -sz];
+        let det = |m: [[f64; 3]; 3]| {
+            m[0][0] * (m[1][1] * m[2][2] - m[1][2] * m[2][1])
+                - m[0][1] * (m[1][0] * m[2][2] - m[1][2] * m[2][0])
+                + m[0][2] * (m[1][0] * m[2][1] - m[1][1] * m[2][0])
+        };
+        let d = det(m);
+        let col = |i: usize| {
+            let mut mi = m;
+            for (row, v) in mi.iter_mut().zip(rhs) {
+                row[i] = v;
+            }
+            det(mi) / d
+        };
+        let (a, b, c) = (col(0), col(1), col(2));
+        let (cx, cy) = (-a / 2.0, -b / 2.0);
+        (cx, cy, (cx * cx + cy * cy - c).max(0.0).sqrt())
+    }
+
+    /// RANSAC: the circle through three sampled points with the most
+    /// points within `tol` of it, refit by least squares on its inliers.
+    fn ransac_circle(pts: &[(f64, f64)], tol: f64) -> (f64, f64, f64) {
+        let mut rng = Lcg(0xc1c1e);
+        let mut best: Vec<(f64, f64)> = Vec::new();
+        for _ in 0..3000 {
+            let pick = |rng: &mut Lcg| pts[(rng.next() * pts.len() as f64) as usize];
+            let sample = [pick(&mut rng), pick(&mut rng), pick(&mut rng)];
+            let (cx, cy, rad) = lsq_circle(&sample);
+            if !rad.is_finite() || rad == 0.0 {
+                continue;
+            }
+            let inliers: Vec<_> = pts
+                .iter()
+                .copied()
+                .filter(|&(x, y)| ((x - cx).hypot(y - cy) - rad).abs() < tol)
+                .collect();
+            if inliers.len() > best.len() {
+                best = inliers;
+            }
+        }
+        lsq_circle(&best)
+    }
+
+    #[test]
+    fn blind_circle_fit_does_not_find_home() {
+        // I2. The attacker gets the cut endpoints alone (an oracle the
+        // real attacker lacks) and fits a circle two ways. Neither
+        // centre may land within 0.5r of home, and neither radius may
+        // land near r. Against the exact home-circle clip both fits
+        // return home and r to within a metre.
+        let r = 250.0;
+        let acts = radiating(240, r);
+        for i in 0..8 {
+            let kept = apply(acts.clone(), params(r, salt_n(i))).expect("obfuscate");
+            let pts = cut_endpoints(&kept);
+            assert!(pts.len() >= 240, "too few cut endpoints: {}", pts.len());
+            for (name, (cx, cy, rad)) in [
+                ("least squares", lsq_circle(&pts)),
+                ("ransac", ransac_circle(&pts, 0.02 * r)),
+            ] {
+                let miss = cx.hypot(cy);
+                assert!(
+                    miss >= 0.5 * r,
+                    "salt {i}: {name} fit centre is {miss:.1} m from home (r = {r})"
+                );
+                assert!(
+                    (rad - r).abs() > 0.25 * r,
+                    "salt {i}: {name} fit radius {rad:.1} m reveals r = {r}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn no_output_vertex_within_radius_of_home() {
+        // I1 over many salts and radii, on routes that start at the
+        // door and routes that pass straight through.
+        for r in [100.0, 250.0, 1000.0] {
+            let acts = radiating(80, r);
+            for i in 0..8 {
+                let kept = apply(acts.clone(), params(r, salt_n(i))).expect("obfuscate");
+                assert!(!kept.is_empty());
+                for ob in &kept {
+                    for &(lat, lng) in ob.segments().iter().flatten() {
+                        let d = haversine_m(lat, lng, HOME.0, HOME.1);
+                        assert!(d >= r, "salt {i}: vertex {d:.2} m from home, r = {r}");
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn hidden_zone_contains_home_disk() {
+        // I1 at the zone level: every point within r of home, the rim
+        // included, sits inside the offset disk.
+        for r in [50.0, 250.0, 1000.0] {
+            for i in 0..32 {
+                let s = salt_n(i);
+                let z = HiddenZone::derive(&params(r, s.clone()), &s);
+                let off = haversine_m(HOME.0, HOME.1, z.center.0, z.center.1);
+                assert!((0.6 * r - 0.01..=0.8 * r + 0.01).contains(&off));
+                for k in 0..360 {
+                    let a = (k as f64).to_radians();
+                    let (lat, lng) = to_latlng(r * a.cos(), r * a.sin());
+                    assert!(
+                        z.contains(lat, lng),
+                        "salt {i}: rim point {k} deg outside zone"
+                    );
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn output_is_deterministic_and_seeded_per_activity() {
+        // I3. Same config, same output, so renders can't be averaged.
+        // The cut moves with the activity id and with the salt.
+        let r = 250.0;
+        let acts = radiating(40, r);
+        let run = |s: PrivacySalt| {
+            apply(acts.clone(), params(r, s))
+                .expect("obfuscate")
+                .iter()
+                .map(|o| o.segments().to_vec())
+                .collect::<Vec<_>>()
+        };
+        assert_eq!(run(salt()), run(salt()));
+        assert_ne!(run(salt()), run(salt_n(1)));
+
+        let pts: Vec<(f64, f64)> = (0..=20).map(|i| to_latlng(50.0 * i as f64, 0.0)).collect();
+        let twins = vec![activity_from(1, &pts), activity_from(2, &pts)];
+        let kept = apply(twins, params(r, salt())).expect("obfuscate");
+        assert_eq!(kept.len(), 2);
+        assert_ne!(kept[0].segments()[0][0], kept[1].segments()[0][0]);
+    }
+
+    #[test]
+    fn positive_radius_without_salt_is_an_error() {
+        // I5: no silent fallback to the exact home circle.
+        let mut p = params(250.0, salt());
+        p.salt = None;
+        let err = apply(vec![act(42.94, -85.60)], p).unwrap_err();
+        assert!(err.to_string().contains("[privacy].salt"), "got: {err}");
+    }
+
+    #[test]
+    fn short_salt_rejected_and_debug_redacted() {
+        assert!(PrivacySalt::new("too-short").is_err());
+        let p = params(250.0, salt());
+        let shown = format!("{p:?}");
+        assert!(!shown.contains("test-salt-not-a-secret"), "{shown}");
     }
 }

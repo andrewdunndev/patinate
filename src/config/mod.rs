@@ -10,6 +10,8 @@ use figment::providers::{Env, Format, Toml};
 use serde::Deserialize;
 use std::path::{Path, PathBuf};
 
+use crate::obfuscation::PrivacySalt;
+
 #[derive(Debug, Deserialize)]
 struct RawConfig {
     general: General,
@@ -40,6 +42,8 @@ struct Privacy {
     home_lat: f64,
     home_lng: f64,
     obfuscation_radius_m: f64,
+    #[serde(default)]
+    salt: Option<String>,
 }
 
 #[derive(Debug, Default, Deserialize)]
@@ -68,6 +72,9 @@ pub struct ValidatedConfig {
     pub home_lat: f64,
     pub home_lng: f64,
     pub obfuscation_radius_m: f64,
+    /// Seeds the hidden zone; required by `obfuscation::apply()` when
+    /// the radius is positive. Debug output is redacted.
+    pub privacy_salt: Option<PrivacySalt>,
     pub strava_client_id: Option<String>,
     pub strava_client_secret: Option<String>,
     pub strava_refresh_token: Option<String>,
@@ -222,6 +229,12 @@ fn validate(raw: RawConfig) -> Result<ValidatedConfig> {
              Try 1200 x 1600 for a 3:4 poster aspect."
         );
     }
+    let privacy_salt = raw
+        .privacy
+        .salt
+        .as_deref()
+        .map(PrivacySalt::new)
+        .transpose()?;
     Ok(ValidatedConfig {
         city_name: raw.general.city_name,
         country: raw.general.country,
@@ -234,6 +247,7 @@ fn validate(raw: RawConfig) -> Result<ValidatedConfig> {
         home_lat: raw.privacy.home_lat,
         home_lng: raw.privacy.home_lng,
         obfuscation_radius_m: raw.privacy.obfuscation_radius_m,
+        privacy_salt,
         strava_client_id: raw.strava.client_id,
         strava_client_secret: raw.strava.client_secret,
         strava_refresh_token: raw.strava.refresh_token,
@@ -263,6 +277,7 @@ mod tests {
                 home_lat,
                 home_lng,
                 obfuscation_radius_m: radius,
+                salt: None,
             },
             strava: Strava::default(),
         }
