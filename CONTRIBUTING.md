@@ -2,9 +2,11 @@
 
 ## Build prerequisites
 
-- Rust toolchain pinned in `rust-toolchain.toml` (1.94 at the time of
-  v0.1). `rustup` reads that file on first build.
-- `just`, `librsvg`'s `rsvg-convert` and ImageMagick's `magick` are
+- Rust toolchain pinned in `rust-toolchain.toml`; `rustup` reads that
+  file on first build.
+- `git-lfs`: run `git lfs install` once; a clone pulls the OSM fixture
+  through LFS.
+- `just` (pinned in `mise.toml`), `librsvg`'s `rsvg-convert` and ImageMagick's `magick` are
   required for the `just` recipes. The crate itself doesn't need
   them.
 - macOS / Linux are tested. Windows is supported in code but not
@@ -13,7 +15,8 @@
 ## Day-to-day commands
 
 ```bash
-just               # list recipes: release, example, themes, site, web, clean
+just               # list recipes: all, release, example, themes, site, web,
+                   # check-pixels, clean
 
 cargo fmt
 cargo clippy --all-targets -- -D warnings

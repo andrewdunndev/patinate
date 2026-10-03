@@ -146,9 +146,9 @@ and screens on a dark one; `heat.blend` (`normal`, `multiply`,
 <details>
 <summary><strong>Embed in a page</strong></summary>
 
-The `cycle.dunn.dev` recipe: render once, rasterize to WebP, ship
-the WebP. The consumer page provides its own typography (the `--web`
-preset skips it).
+One way to embed: render once, rasterize to WebP, ship the WebP. The
+consumer page provides its own typography (the `--web` preset skips
+it).
 
 ```bash
 patinate render --theme cycle_heat --cycling --web --transparent-bg \
