@@ -585,13 +585,13 @@ mod tests {
     fn drops_activities_within_radius() {
         // Both rides are polyline-less, so apply() falls back to the
         // start-point check. `near` is inside, `far` is outside.
-        let near = act(42.9619, -85.6218);
-        let far = act(42.94, -85.60);
+        let near = act(42.9619, -85.7018);
+        let far = act(42.94, -85.68);
         let kept = apply(
             vec![near, far],
             ObfuscationParams {
                 home_lat: 42.96,
-                home_lng: -85.622,
+                home_lng: -85.702,
                 radius_m: 250.0,
                 salt: Some(salt()),
                 offset_m: 750.0,
@@ -605,10 +605,10 @@ mod tests {
     #[test]
     fn radius_zero_disables_obfuscation() {
         let kept = apply(
-            vec![act(42.96, -85.622)],
+            vec![act(42.96, -85.702)],
             ObfuscationParams {
                 home_lat: 42.96,
-                home_lng: -85.622,
+                home_lng: -85.702,
                 radius_m: 0.0,
                 salt: None,
                 offset_m: 750.0,
@@ -621,12 +621,12 @@ mod tests {
     #[test]
     fn clip_drops_segment_entirely_inside() {
         // 4 points within ~50m of center, radius 500m.
-        let center = (42.96, -85.622);
+        let center = (42.96, -85.702);
         let line = line_from(&[
-            (42.9619, -85.6218),
-            (42.9620, -85.6217),
-            (42.9618, -85.6216),
-            (42.9617, -85.6219),
+            (42.9619, -85.7018),
+            (42.9620, -85.7017),
+            (42.9618, -85.7016),
+            (42.9617, -85.7019),
         ]);
         let segs = clip_to_outside_circle(&line, center, 500.0);
         assert!(
@@ -639,12 +639,12 @@ mod tests {
     fn clip_keeps_segment_entirely_outside() {
         // 4 points all >2km from center, radius 500m. The segments
         // also don't chord through.
-        let center = (42.96, -85.622);
+        let center = (42.96, -85.702);
         let line = line_from(&[
-            (42.94, -85.60),
-            (42.943, -85.598),
-            (42.944, -85.599),
-            (42.945, -85.600),
+            (42.94, -85.68),
+            (42.943, -85.678),
+            (42.944, -85.679),
+            (42.945, -85.680),
         ]);
         let segs = clip_to_outside_circle(&line, center, 500.0);
         assert_eq!(segs.len(), 1, "single contiguous outside run expected");
@@ -655,10 +655,10 @@ mod tests {
     fn clip_one_in_one_out() {
         // a inside, b outside. Expect a single 2-point segment:
         // [boundary_point, b].
-        let center = (42.96, -85.622);
+        let center = (42.96, -85.702);
         let radius = 500.0;
-        let a = (42.9619, -85.6218); // ~15m from center, inside
-        let b = (42.94, -85.60); // ~3km from center, outside
+        let a = (42.9619, -85.7018); // ~15m from center, inside
+        let b = (42.94, -85.68); // ~3km from center, outside
         let line = line_from(&[a, b]);
         let segs = clip_to_outside_circle(&line, center, radius);
         assert_eq!(segs.len(), 1);
@@ -682,25 +682,25 @@ mod tests {
         // starts across town, loops through the home circle, and
         // returns. After apply(), no `(lat, lng)` in any segment may
         // sit inside the home circle. This is the load-bearing test.
-        let home = (42.96_f64, -85.622_f64);
+        let home = (42.96_f64, -85.702_f64);
         let radius = 250.0_f64;
         // Hand-pick 12 points that trace a there-and-back route through
         // home: starts 4km west, jogs north, dips south *through* the
         // home circle, and exits east. Several consecutive points are
         // inside the circle.
         let pts: Vec<(f64, f64)> = vec![
-            (42.96, -85.66),     // start, ~3.3km W
-            (42.964, -85.65),    // approaching
-            (42.966, -85.64),    // approaching
-            (42.965, -85.63),    // approaching
-            (42.963, -85.624),   // ~25m N of home, INSIDE
-            (42.9616, -85.6222), // ~25m S of home, INSIDE
-            (42.961, -85.621),   // ~125m S, INSIDE
-            (42.964, -85.619),   // ~325m NE, OUTSIDE
-            (42.966, -85.612),   // departing
-            (42.963, -85.602),   // departing
-            (42.96, -85.592),    // end, ~2.4km E
-            (42.96, -85.59),     // end, ~2.8km E
+            (42.96, -85.74),     // start, ~3.3km W
+            (42.964, -85.73),    // approaching
+            (42.966, -85.72),    // approaching
+            (42.965, -85.71),    // approaching
+            (42.963, -85.704),   // ~25m N of home, INSIDE
+            (42.9616, -85.7022), // ~25m S of home, INSIDE
+            (42.961, -85.701),   // ~125m S, INSIDE
+            (42.964, -85.699),   // ~325m NE, OUTSIDE
+            (42.966, -85.692),   // departing
+            (42.963, -85.682),   // departing
+            (42.96, -85.672),    // end, ~2.4km E
+            (42.96, -85.67),     // end, ~2.8km E
         ];
         let polyline_str = polyline::encode_coordinates(
             pts.iter()
@@ -708,7 +708,7 @@ mod tests {
             5,
         )
         .expect("encode polyline");
-        let mut a = act(42.96, -85.66);
+        let mut a = act(42.96, -85.74);
         a.summary_polyline = polyline_str;
         let kept = apply(
             vec![a],
@@ -751,13 +751,13 @@ mod tests {
         // segment between them passes through the center. Expect two
         // outside runs, each with the original endpoint plus a
         // boundary intersection.
-        let center = (42.96, -85.622);
+        let center = (42.96, -85.702);
         let radius = 200.0;
         // ~1.1km west and ~1.1km east of center along the same
         // latitude. The midpoint is the center, so the chord goes
         // straight through.
-        let a = (42.96, -85.64);
-        let b = (42.96, -85.61);
+        let a = (42.96, -85.72);
+        let b = (42.96, -85.69);
         let line = line_from(&[a, b]);
         let segs = clip_to_outside_circle(&line, center, radius);
         assert_eq!(segs.len(), 2, "chord-through should yield two runs");
@@ -779,7 +779,7 @@ mod tests {
 
     // ---- hidden-zone tests: synthetic data only ----
 
-    const HOME: (f64, f64) = (42.96, -85.622);
+    const HOME: (f64, f64) = (42.96, -85.702);
     const EARTH_R: f64 = 6_371_000.0;
     const RHO: f64 = 750.0;
 
@@ -1107,7 +1107,7 @@ mod tests {
         // I5: no silent fallback to the exact home circle.
         let mut p = params(250.0, salt());
         p.salt = None;
-        let err = apply(vec![act(42.94, -85.60)], p).unwrap_err();
+        let err = apply(vec![act(42.94, -85.68)], p).unwrap_err();
         assert!(err.to_string().contains("[privacy].salt"), "got: {err}");
     }
 

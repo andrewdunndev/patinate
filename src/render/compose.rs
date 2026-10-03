@@ -771,7 +771,7 @@ mod tests {
             activity_type: ActivityType::Ride,
             start_date: Utc::now(),
             start_lat: 42.95,
-            start_lng: -85.65,
+            start_lng: -85.73,
             distance_m: 5000.0,
             moving_time_s: 600,
             summary_polyline: polyline,
@@ -793,15 +793,15 @@ mod tests {
 
         let coords = vec![
             geo_types::Coord {
-                x: -85.65_f64,
+                x: -85.73_f64,
                 y: 42.95_f64,
             },
             geo_types::Coord {
-                x: -85.64,
+                x: -85.72,
                 y: 42.955,
             },
             geo_types::Coord {
-                x: -85.63,
+                x: -85.71,
                 y: 42.98,
             },
         ];
@@ -907,8 +907,8 @@ mod tests {
             ]
         };
         let basemap = Basemap {
-            water_lines: vec![line(-85.66)],
-            streams: vec![line(-85.64)],
+            water_lines: vec![line(-85.74)],
+            streams: vec![line(-85.72)],
             ..Basemap::default()
         };
         let water_lines = |web: bool| -> String {
@@ -970,11 +970,11 @@ mod tests {
         let activities = vec![
             synthetic_activity(
                 1,
-                coords(&[(42.95, -85.66), (42.96, -85.65), (42.97, -85.64)]),
+                coords(&[(42.95, -85.74), (42.96, -85.73), (42.97, -85.72)]),
             ),
             synthetic_activity(
                 2,
-                coords(&[(42.97, -85.68), (42.95, -85.64), (42.94, -85.62)]),
+                coords(&[(42.97, -85.76), (42.95, -85.72), (42.94, -85.70)]),
             ),
         ];
         let obf = obfuscation::apply(
@@ -1120,7 +1120,7 @@ mod tests {
         let theme = theme::load_named("noir_heat", None).expect("embedded theme loads");
         let secret = "synthetic-salt-must-not-render";
         let coords = (0..=120).map(|i| geo_types::Coord {
-            x: -85.70 + 0.001 * i as f64,
+            x: -85.78 + 0.001 * i as f64,
             y: 42.95,
         });
         let polyline_str = polyline::encode_coordinates(coords, 5).expect("encode");
@@ -1128,7 +1128,7 @@ mod tests {
             vec![synthetic_activity(1, polyline_str)],
             ObfuscationParams {
                 home_lat: 42.95,
-                home_lng: -85.64,
+                home_lng: -85.72,
                 radius_m: 250.0,
                 salt: Some(obfuscation::PrivacySalt::new(secret).expect("salt")),
                 offset_m: 750.0,
@@ -1167,11 +1167,11 @@ mod tests {
         let basemap = Basemap::default();
         let coords = vec![
             geo_types::Coord {
-                x: -85.65_f64,
+                x: -85.73_f64,
                 y: 42.95_f64,
             },
             geo_types::Coord {
-                x: -85.64,
+                x: -85.72,
                 y: 42.955,
             },
         ];
