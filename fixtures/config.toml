@@ -17,11 +17,12 @@ viewbox_height = 1600
 # residential address), used as a clearly non-identifying example
 # home center for fixture renders. Replace with your own home_lat /
 # home_lng in your real config (kept private at
-# ~/.config/patinate/config.toml). 1000 m radius matches the README's
-# public-publish floor.
+# ~/.config/patinate/config.toml), with your own secret salt there too.
+# This salt is public, so it hides nothing; never copy it.
 home_lat = 42.9618
 home_lng = -85.6217
 obfuscation_radius_m = 250
+salt = "public-fixture-salt-not-a-secret"
 
 
 [strava]

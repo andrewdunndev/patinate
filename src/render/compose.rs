@@ -756,8 +756,11 @@ mod tests {
                 home_lat: cfg.home_lat,
                 home_lng: cfg.home_lng,
                 radius_m: 0.0,
+                salt: None,
+                offset_m: 750.0,
             },
-        );
+        )
+        .expect("obfuscate");
         assert_eq!(obf.len(), 2, "synthetic activities should both survive");
 
         let svg = render(
@@ -809,6 +812,52 @@ mod tests {
     }
 
     #[test]
+    fn render_never_emits_privacy_salt() {
+        // The salt seeds the hidden zone; it must not reach the SVG.
+        let cfg = config::load("fixtures/config.toml").expect("config loads");
+        let theme = theme::load_named("noir_heat", None).expect("embedded theme loads");
+        let secret = "synthetic-salt-must-not-render";
+        let coords = (0..=120).map(|i| geo_types::Coord {
+            x: -85.70 + 0.001 * i as f64,
+            y: 42.95,
+        });
+        let polyline_str = polyline::encode_coordinates(coords, 5).expect("encode");
+        let obf = obfuscation::apply(
+            vec![synthetic_activity(1, polyline_str)],
+            ObfuscationParams {
+                home_lat: 42.95,
+                home_lng: -85.64,
+                radius_m: 250.0,
+                salt: Some(obfuscation::PrivacySalt::new(secret).expect("salt")),
+                offset_m: 750.0,
+            },
+        )
+        .expect("obfuscate");
+        assert_eq!(obf[0].segments().len(), 2, "route should be cut in two");
+        for anonymize in [false, true] {
+            let tuning = HeatTuning {
+                anonymize,
+                ..HeatTuning::default()
+            };
+            let svg = render(
+                &cfg,
+                &Basemap::default(),
+                &obf,
+                &theme,
+                false,
+                false,
+                false,
+                tuning,
+            )
+            .expect("render ok");
+            assert!(
+                !svg.contains(secret),
+                "salt leaked (anonymize = {anonymize})"
+            );
+        }
+    }
+
+    #[test]
     fn anonymize_strips_data_attrs_and_scrubs_desc() {
         let cfg = config::load("fixtures/config.toml").expect("config loads");
         let theme = theme::load_named("noir_heat", None).expect("embedded theme loads");
@@ -831,8 +880,11 @@ mod tests {
                 home_lat: cfg.home_lat,
                 home_lng: cfg.home_lng,
                 radius_m: 0.0,
+                salt: None,
+                offset_m: 750.0,
             },
-        );
+        )
+        .expect("obfuscate");
         let tuning = HeatTuning {
             anonymize: true,
             ..HeatTuning::default()
@@ -878,8 +930,11 @@ mod tests {
                 home_lat: cfg.home_lat,
                 home_lng: cfg.home_lng,
                 radius_m: cfg.obfuscation_radius_m,
+                salt: cfg.privacy_salt.clone(),
+                offset_m: cfg.privacy_offset_m,
             },
-        );
+        )
+        .expect("obfuscate");
 
         let svg = render(
             &cfg,

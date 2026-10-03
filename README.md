@@ -69,24 +69,24 @@ Token" is `read`-only and will not work for sync.
 
 ## Privacy
 
-Real polyline-circle obfuscation. Every polyline is trimmed at the
-home circle's edge before render; the inside-circle segment never
-reaches the SVG. Activities entirely inside the circle are dropped.
+Nothing within `obfuscation_radius_m` of home reaches the SVG. The
+hidden zone is offset from home by a secret amount (up to `offset_m`,
+default 750 m, floor 250, seeded by `[privacy].salt`), edges trimmed.
+Tracks still converge toward home: a determined analyst can narrow it
+to roughly 100-250 m. A larger radius adds only modest cover.
+A radius needs a private, stable salt (`openssl rand -hex 16`).
 
 Default-rendered SVGs embed `data-rider`, `data-bike`, `data-year`,
 `data-type` on heat paths plus exact center coords in `<desc>`.
 Useful for consumer-page filters; identifying in a public publication.
 
-**For public publication, combine three things:**
+**For public publication, also anonymize:**
 
 ```bash
 patinate render --theme cycle_heat --anonymize --obfuscation-radius-m 1000 --out heatmap.svg
-rsvg-convert -w 1200 heatmap.svg -o heatmap.png
 ```
 
-Then publish the **PNG**. PNG carries no `data-*` attrs, no `<desc>`,
-no machine-readable polyline geometry. Only what the eye sees
-survives.
+`--anonymize` drops the `data-*` attrs and `<desc>`; a PNG hides no more.
 
 ## Subcommands
 
@@ -156,10 +156,10 @@ rsvg-convert hero.svg -w 3600 -h 2160 -o /tmp/hero.png
 magick /tmp/hero.png -quality 82 hero.webp
 ```
 
-For inline SVG (hover behavior, JS filters, vector zoom), skip the
-rasterize. Heat paths emit `data-rider` / `data-bike` / `data-year` /
-`data-type` for consumer JS to wire up. **If the embedding page is
-public, `--anonymize` first.** See "Privacy" above.
+For inline SVG (hover, JS filters, vector zoom), skip the rasterize;
+it isn't a privacy step. Heat paths emit `data-rider` / `data-bike` /
+`data-year` / `data-type` for consumer JS. **If the page is public,
+`--anonymize` first.** See "Privacy" above.
 
 </details>
 
