@@ -62,10 +62,10 @@ import Layout from '../layouts/Layout.astro';
         <p class="tile-eyebrow">discipline · posture</p>
         <p class="tile-headline">private</p>
         <p class="tile-prose">
-          Home-coordinate obfuscation: every polyline endpoint within
-          a configurable radius of your home is snapped to a point on
-          the radius circle, so the poster never reveals where you
-          live. Segment names stripped, athlete and gear IDs zeroed
+          Home-coordinate obfuscation: routes are cut at a salted,
+          offset disk covering a configurable radius around home, and
+          each cut is trimmed per ride, so no edge points back to where
+          you live. Segment names stripped, athlete and gear IDs zeroed
           in the bundled fixture.
         </p>
         <p class="tile-meta">circle-obfuscate · 1km+ default</p>

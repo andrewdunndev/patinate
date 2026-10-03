@@ -69,24 +69,24 @@ Token" is `read`-only and will not work for sync.
 
 ## Privacy
 
-Real polyline-circle obfuscation. Every polyline is trimmed at the
-home circle's edge before render; the inside-circle segment never
-reaches the SVG. Activities entirely inside the circle are dropped.
+Nothing within `obfuscation_radius_m` of home reaches the SVG, and
+the cut doesn't outline home: the hidden disk is larger, offset from
+home by a vector seeded from `[privacy].salt`, and each cut end is
+trimmed a further seeded distance. Render refuses a positive radius
+without a salt; set one privately (`openssl rand -hex 16`) and keep it.
 
 Default-rendered SVGs embed `data-rider`, `data-bike`, `data-year`,
 `data-type` on heat paths plus exact center coords in `<desc>`.
 Useful for consumer-page filters; identifying in a public publication.
 
-**For public publication, combine three things:**
+**For public publication, also anonymize:**
 
 ```bash
 patinate render --theme cycle_heat --anonymize --obfuscation-radius-m 1000 --out heatmap.svg
-rsvg-convert -w 1200 heatmap.svg -o heatmap.png
 ```
 
-Then publish the **PNG**. PNG carries no `data-*` attrs, no `<desc>`,
-no machine-readable polyline geometry. Only what the eye sees
-survives.
+`--anonymize` drops the `data-*` attrs and `<desc>`. Rasterizing
+hides nothing more; the protection is in the geometry.
 
 ## Subcommands
 
@@ -156,10 +156,10 @@ rsvg-convert hero.svg -w 3600 -h 2160 -o /tmp/hero.png
 magick /tmp/hero.png -quality 82 hero.webp
 ```
 
-For inline SVG (hover behavior, JS filters, vector zoom), skip the
-rasterize. Heat paths emit `data-rider` / `data-bike` / `data-year` /
-`data-type` for consumer JS to wire up. **If the embedding page is
-public, `--anonymize` first.** See "Privacy" above.
+For inline SVG (hover, JS filters, vector zoom), skip the rasterize;
+it isn't a privacy step. Heat paths emit `data-rider` / `data-bike` /
+`data-year` / `data-type` for consumer JS. **If the page is public,
+`--anonymize` first.** See "Privacy" above.
 
 </details>
 
