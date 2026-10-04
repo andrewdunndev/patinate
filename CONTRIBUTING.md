@@ -73,12 +73,11 @@ same code path on a synthetic basemap and finishes in milliseconds.
 - Live-network tests against Strava, Overpass, or Nominatim. CI does
   not have credentials and these endpoints are shared community
   resources we don't want to hit from automated runs.
-- Schema-migration tests. v0.1 uses `PRAGMA user_version = 1` and
-  ships no migrations; v0.2 will add idempotent ALTER paths and tests
-  for each step.
+- Schema-migration tests. The cache stamps `PRAGMA user_version = 1`
+  and ships no migrations, so there is nothing to test.
 - Multi-rider rendering. The data model already supports multiple
   athletes, but the renderer currently keys the data-rider attribute
-  off a single athlete_id; the multi-rider path will land with v0.2.
+  off a single athlete_id.
 - Antimeridian handling in the projection. Documented as a known
   limitation; affected geographies are vanishingly rare.
 

@@ -55,8 +55,7 @@ impl Projection {
     /// `+/-180` longitude will produce a degenerate bbox (the Mercator
     /// `min_mx`/`max_mx` straddle the +/-pi seam without wrapping).
     /// Affected users are vanishingly rare (Fiji, eastern Russia,
-    /// the Aleutians); patinate v0.1 does not split the bbox across
-    /// the seam.
+    /// the Aleutians); the bbox is not split across the seam.
     pub fn fit_radius(
         center_lat: f64,
         center_lng: f64,
