@@ -1,55 +1,75 @@
 ---
 import '../styles/global.css';
+import Mark from '../components/Mark.astro';
 
 interface Props {
   title: string;
-  description?: string;
+  description: string;
 }
 const { title, description } = Astro.props;
-
-// Replace the patinate placeholder with your project slug.
-const pageTitle = title === 'Home' ? 'patinate.dunn.dev' : `${title} — patinate.dunn.dev`;
+const pageTitle = title === 'Home' ? 'patinate · Strava posters, pulled like prints' : `${title} · patinate`;
 
 const nav = [
-  { href: '/', label: 'Home' },
-  { href: 'https://gitlab.com/dunn.dev/patinate', label: 'Source', external: true },
+  { href: '/', label: 'Prints' },
+  { href: '/docs/', label: 'Docs' },
+  { href: '/playground/', label: 'Press' },
+  { href: '/brand/', label: 'Brand' },
 ];
-
-const path = Astro.url.pathname.replace(/\/$/, '') || '/';
+const here = Astro.url.pathname.endsWith('/') ? Astro.url.pathname : Astro.url.pathname + '/';
 ---
 <!DOCTYPE html>
-<html lang="en" data-theme="light">
+<html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>{pageTitle}</title>
-  {description && <meta name="description" content={description} />}
+  <meta name="description" content={description} />
   <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;1,300;1,400&family=IBM+Plex+Mono:wght@400;500;700&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&family=IBM+Plex+Serif:ital,wght@0,400;0,500;1,400&display=swap" rel="stylesheet" />
 </head>
 <body>
-  <header class="site-header">
-    <div class="site-header-inner">
-      <a href="/" class="brand"><span class="brand-name">patinate</span>.dunn.dev</a>
-      <nav class="site-nav" aria-label="Primary">
-        {nav.map(item => (
-          item.external
-            ? <a href={item.href} target="_blank" rel="noopener">{item.label}</a>
-            : <a href={item.href} class:list={{ active: item.href === path || item.href === path + '/' }}>{item.label}</a>
+  <header class="site-head">
+    <div class="wrap">
+      <a class="brand" href="/"><Mark /><span>patinate</span></a>
+      <nav class="site-nav" aria-label="Site">
+        {nav.map((item) => (
+          <a href={item.href} aria-current={item.href === here ? 'page' : undefined}>{item.label}</a>
         ))}
+        <a class="ext" href="https://gitlab.com/dunn.dev/patinate">Source ↗</a>
       </nav>
     </div>
   </header>
-  <main class="page">
+  <main class="wrap">
     <slot />
   </main>
-  <footer class="site-footer">
-    <div class="site-footer-inner">
-      <span>patinate · MIT</span>
-      <span>gitlab.com/dunn.dev/patinate</span>
+  <footer class="site-foot">
+    <div class="wrap">
+      <span>Built by <a href="https://andrew.dunn.dev">Andrew G. Dunn</a> · MIT</span>
+      <a href="https://gitlab.com/dunn.dev/patinate">source</a>
+      <a href="https://gitlab.com/dunn.dev/patinate/-/releases">releases</a>
+      <span class="colophon">a dunn.dev press · set in IBM Plex</span>
     </div>
   </footer>
+  <script>
+    for (const pre of document.querySelectorAll<HTMLElement>('pre.copyable')) {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'copy';
+      btn.textContent = 'copy';
+      btn.addEventListener('click', async () => {
+        const text = pre.querySelector('code')?.textContent ?? '';
+        try {
+          await navigator.clipboard.writeText(text);
+          btn.textContent = 'copied';
+        } catch {
+          btn.textContent = 'select it';
+        }
+        setTimeout(() => { btn.textContent = 'copy'; }, 1600);
+      });
+      pre.appendChild(btn);
+    }
+  </script>
 </body>
 </html>

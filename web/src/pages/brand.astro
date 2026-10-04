@@ -1,0 +1,74 @@
+---
+import Layout from '../layouts/Layout.astro';
+import Mark from '../components/Mark.astro';
+import { editions, inks } from '../data/themes';
+
+const tokens = [
+  ['--bg', 'ground'], ['--surface', 'cards, code'], ['--border', 'rules'], ['--border-strong', 'controls'],
+  ['--text', 'ink'], ['--text-2', 'body'], ['--text-muted', 'stamps'], ['--accent', 'moss'],
+];
+---
+<Layout title="Brand" description="patinate's brand sheet: the mark, the type, the estate palette, the theme inks and the README header.">
+  <div class="section-head page-head">
+    <p class="stamp">brand sheet</p>
+    <h1>Mark, type, ground, ink.</h1>
+    <p class="lede">One sheet for whoever touches the README, the site or a release page. Palette, scale and body type are the dunn.dev estate's; patinate adds its mark and Plex Serif for display.</p>
+  </div>
+
+  <section class="section" style="padding-top:var(--space-6)">
+    <p class="stamp">the mark · in register</p>
+    <div class="mark-row" style="margin-top:var(--space-4)">
+      <figure><Mark size={128} label="patinate mark at 128 px" /><figcaption class="stamp">128</figcaption></figure>
+      <figure><Mark size={48} label="patinate mark at 48 px" /><figcaption class="stamp">48</figcaption></figure>
+      <figure><Mark size={24} label="patinate mark at 24 px" /><figcaption class="stamp">24 · favicon</figcaption></figure>
+      <figure class="on-ink"><Mark size={64} label="patinate mark reversed" reversed /><figcaption class="stamp" style="color:inherit">reversed</figcaption></figure>
+    </div>
+    <div class="prose" style="margin-top:var(--space-5)">
+      <p>Three plates stacked in register, each fainter as it recedes, and one route printed across the front plate in the accent. It reads at 24 px and says what the tool does: layers, in register. It has no circle and no point, because a ring on a map is the thing this project works never to imply. The dunn.dev mark is the estate's and is never redrawn here.</p>
+    </div>
+  </section>
+
+  <section class="section">
+    <p class="stamp">type · IBM Plex</p>
+    <div class="sheet-grid" style="margin-top:var(--space-4)">
+      <div class="type-spec">
+        <span class="stamp">display · Plex Serif 400/500, italic for the line</span>
+        <span class="sample-display">Posters pulled from <em style="color:var(--accent)">the roads you ride.</em></span>
+      </div>
+      <div class="type-spec">
+        <span class="stamp">body · Plex Sans, estate scale</span>
+        <span class="sample-body">Where you ride often the strokes stack and the color deepens, the way patina builds on metal.</span>
+      </div>
+      <div class="type-spec">
+        <span class="stamp">stamps and commands · Plex Mono</span>
+        <span class="sample-mono">THEME 03 · WARM_BEIGE<br />patinate render --theme warm_beige --cycling</span>
+      </div>
+    </div>
+  </section>
+
+  <section class="section">
+    <p class="stamp">ground and ink · estate tokens</p>
+    <div class="swatches" style="margin-top:var(--space-4)">
+      {tokens.map(([v, use]) => <div class="swatch"><i style={`background:var(${v})`}></i><span><b>{v}</b>{use}</span></div>)}
+    </div>
+    <div class="prose" style="margin-top:var(--space-5)">
+      <p>The page follows <code>@dunn.dev/reference</code> in both light and dark. Theme inks live in the theme JSONs and are never site tokens; they appear on the site only inside a print or an ink bar.</p>
+    </div>
+    <div class="sheet-grid" style="margin-top:var(--space-5)">
+      {editions.map(({ theme }) => (
+        <div><div class="inkbar" aria-hidden="true">{inks(theme).map((c) => <i style={`background:${c}`}></i>)}</div><p class="stamp" style="margin-top:var(--space-2)">{theme.name}</p></div>
+      ))}
+    </div>
+  </section>
+
+  <section class="section">
+    <p class="stamp">README header · as the forge renders it</p>
+    <div class="readme-mock" style="margin-top:var(--space-4)">
+      <img src="/hero.svg" width="1200" height="430" alt="The patinate README hero" loading="lazy" />
+      <h1>patinate</h1>
+      <div class="badges" aria-hidden="true"><i></i><i></i><i></i></div>
+      <p>Render Strava activity into stylized heatmap posters and inline SVG. The patina builds where you ride often: overlapping low-alpha strokes accumulate into brighter color the way actual patina builds on metal.</p>
+    </div>
+    <p class="hint" style="margin-top:var(--space-3)">The hero is <code>hero.svg</code> at the repo root: 1200 × 430, literal colors, system font fallbacks. The forge strips inline SVG, so it ships as a file.</p>
+  </section>
+</Layout>
