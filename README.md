@@ -124,7 +124,7 @@ and screens on a dark one; `heat.blend` (`normal`, `multiply`,
 | `--gear <id>` | Strava `gear_id` filter. Repeatable. |
 | `--activity-id <n>` | Render a single activity by Strava ID. |
 | `--min-distance-m <m>` | Drop sub-`m` noise stubs. Default `1000`. |
-| `--web` | Inline-embed preset: lighter glow, compact paths sized to the viewbox, no typography, no minor roads or streams. |
+| `--web` | Inline-embed preset: lighter glow, compact paths, no typography, minor roads or streams. It doesn't imply `--anonymize`; public pages pass both. |
 | `--transparent-bg` | Skip the background rect. For inlining over a page background. |
 | `--heat-only` | Skip basemap; render heat plus typography only. |
 | `--anonymize` | Strip `data-*` from heat paths and scrub `<desc>`. Use for public publication. |

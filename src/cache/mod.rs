@@ -34,11 +34,19 @@ pub fn default_cache_path() -> Result<PathBuf> {
 /// Open (or create) a cache database at `path`, ensuring the parent
 /// directory exists and the schema is initialized. The returned
 /// connection is ready for use by `queries::*`.
+///
+/// The cache holds the Strava tokens and every synced route, home
+/// included, so on unix a new directory is created 0700, patinate's
+/// own default directory is tightened to 0700, and the database is
+/// created, or tightened, to 0600. SQLite gives its journal the
+/// database's mode. Other existing `--cache` parents are left alone.
 pub fn open(path: impl AsRef<Path>) -> Result<Connection> {
     let path = path.as_ref();
     if let Some(parent) = path.parent() {
         if !parent.as_os_str().is_empty() {
-            std::fs::create_dir_all(parent).with_context(|| {
+            let own = ProjectDirs::from("dev", "dunn", "patinate")
+                .is_some_and(|d| d.data_dir() == parent);
+            create_private_dir(parent, own).with_context(|| {
                 format!(
                     "could not create cache directory {parent:?}. \
                      Check filesystem permissions or pick a different \
@@ -47,6 +55,8 @@ pub fn open(path: impl AsRef<Path>) -> Result<Connection> {
             })?;
         }
     }
+    make_private_file(path)
+        .with_context(|| format!("could not restrict the cache database {path:?} to 0600"))?;
     let conn = Connection::open(path).with_context(|| {
         format!(
             "could not open SQLite database at {path:?}. \
@@ -68,6 +78,42 @@ pub fn open(path: impl AsRef<Path>) -> Result<Connection> {
     Ok(conn)
 }
 
+/// Create `dir` 0700 if missing; with `own`, tighten it to 0700 too.
+#[cfg(unix)]
+fn create_private_dir(dir: &Path, own: bool) -> std::io::Result<()> {
+    use std::os::unix::fs::{DirBuilderExt, PermissionsExt};
+    std::fs::DirBuilder::new()
+        .recursive(true)
+        .mode(0o700)
+        .create(dir)?;
+    if own {
+        std::fs::set_permissions(dir, std::fs::Permissions::from_mode(0o700))?;
+    }
+    Ok(())
+}
+
+#[cfg(not(unix))]
+fn create_private_dir(dir: &Path, _own: bool) -> std::io::Result<()> {
+    std::fs::create_dir_all(dir)
+}
+
+#[cfg(unix)]
+fn make_private_file(path: &Path) -> std::io::Result<()> {
+    use std::os::unix::fs::{OpenOptionsExt, PermissionsExt};
+    std::fs::OpenOptions::new()
+        .write(true)
+        .create(true)
+        .truncate(false)
+        .mode(0o600)
+        .open(path)?;
+    std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o600))
+}
+
+#[cfg(not(unix))]
+fn make_private_file(_path: &Path) -> std::io::Result<()> {
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -87,6 +133,45 @@ mod tests {
             )
             .expect("query");
         assert_eq!(n, 1);
+        let _ = std::fs::remove_dir_all(&tmp);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn open_keeps_the_cache_private() {
+        use std::os::unix::fs::PermissionsExt;
+        let mode = |p: &Path| std::fs::metadata(p).expect("stat").permissions().mode() & 0o777;
+        let tmp = std::env::temp_dir().join("patinate-test-cache-private");
+        let _ = std::fs::remove_dir_all(&tmp);
+
+        let db = tmp.join("nested").join("cache.db");
+        open(&db).expect("open");
+        assert_eq!(mode(&db), 0o600, "new database");
+        assert_eq!(mode(&tmp.join("nested")), 0o700, "new directory");
+
+        // A database left world-readable by an older release is tightened.
+        std::fs::set_permissions(&db, std::fs::Permissions::from_mode(0o644)).expect("chmod");
+        open(&db).expect("reopen");
+        assert_eq!(mode(&db), 0o600, "existing database");
+        let _ = std::fs::remove_dir_all(&tmp);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn only_the_own_data_dir_is_tightened() {
+        use std::os::unix::fs::PermissionsExt;
+        let mode = |p: &Path| std::fs::metadata(p).expect("stat").permissions().mode() & 0o777;
+        let tmp = std::env::temp_dir().join("patinate-test-cache-own-dir");
+        let _ = std::fs::remove_dir_all(&tmp);
+        let (own, other) = (tmp.join("own"), tmp.join("other"));
+        for dir in [&own, &other] {
+            std::fs::create_dir_all(dir).expect("mkdir");
+            std::fs::set_permissions(dir, std::fs::Permissions::from_mode(0o755)).expect("chmod");
+        }
+        create_private_dir(&own, true).expect("own");
+        create_private_dir(&other, false).expect("other");
+        assert_eq!(mode(&own), 0o700, "patinate's own data dir");
+        assert_eq!(mode(&other), 0o755, "a --cache parent it doesn't own");
         let _ = std::fs::remove_dir_all(&tmp);
     }
 }

@@ -985,8 +985,8 @@ fn set_user_only_file_mode(path: &Path) -> Result<()> {
 
 #[cfg(not(unix))]
 fn set_user_only_file_mode(_path: &Path) -> Result<()> {
-    // Windows ACL hardening is out of scope for v0.1. The caller
-    // should verify file permissions manually on non-Unix targets.
+    // No Windows ACL hardening: on non-Unix targets the file keeps
+    // its default permissions, so check them by hand.
     Ok(())
 }
 

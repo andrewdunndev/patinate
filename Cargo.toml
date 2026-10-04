@@ -37,7 +37,9 @@ figment = { version = "0.10", features = ["toml", "env"] }
 
 # strava
 reqwest = { version = "0.13", default-features = false, features = ["json", "query", "form", "rustls"] }
-oauth2 = "5"
+# Types and URL building only: auth.rs posts with our own reqwest client,
+# so the bundled HTTP client (a second reqwest and TLS stack) stays out.
+oauth2 = { version = "5", default-features = false }
 tokio = { version = "1", features = ["rt", "macros", "fs", "sync"] }
 url = "2"
 

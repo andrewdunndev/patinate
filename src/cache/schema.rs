@@ -5,16 +5,14 @@
 // database from this module; either the call succeeds and the schema
 // is present, or it errors with a prescriptive message.
 //
-// Schema migrations are deferred to v0.2. v0.1 uses
-// `PRAGMA user_version = 1`; future versions read this value and run
-// idempotent ALTERs against older snapshots. v0.1 itself never
-// migrates: a fresh install starts at version 1.
+// There are no migrations. `init()` creates any missing table and
+// stamps `PRAGMA user_version` with `SCHEMA_VERSION`; nothing reads
+// the stamp back.
 
 use anyhow::{Context, Result};
 use rusqlite::Connection;
 
-/// Current schema version. Bumped by future migrations; never read by
-/// v0.1 itself.
+/// Schema version stamped into `PRAGMA user_version`. Nothing reads it.
 pub const SCHEMA_VERSION: u32 = 1;
 
 const SCHEMA_SQL: &str = r#"
@@ -66,8 +64,7 @@ pub fn init(conn: &Connection) -> Result<()> {
     conn.pragma_update(None, "user_version", SCHEMA_VERSION)
         .with_context(|| {
             "could not set PRAGMA user_version on the cache database. \
-             This pragma is the v0.2 migration hook; if it fails the \
-             cache.db is likely corrupt: remove it and re-run."
+             The cache.db is likely corrupt: remove it and re-run."
         })?;
     Ok(())
 }
@@ -102,6 +99,6 @@ mod tests {
             .query_row("PRAGMA user_version", [], |r| r.get(0))
             .expect("read user_version");
         assert_eq!(version, SCHEMA_VERSION);
-        assert_eq!(version, 1, "v0.1 schema version must be 1");
+        assert_eq!(version, 1, "schema version must be 1");
     }
 }

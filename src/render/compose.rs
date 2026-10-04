@@ -14,9 +14,9 @@ use svg::node::element::{
 };
 
 use crate::config::ValidatedConfig;
-use crate::obfuscation::ObfuscatedActivity;
+use crate::obfuscation::{KeepClear, ObfuscatedActivity, ZONE_SLACK_M};
 use crate::osm::{Basemap, LatLon};
-use crate::render::path::{Compact, signed_area2};
+use crate::render::path::{Compact, KeepOut, signed_area2};
 use crate::render::projection::{Fit, Projection};
 use crate::render::theme::{HeatBlend, RoadTier, Theme};
 use crate::render::typography;
@@ -567,8 +567,12 @@ fn build_heat(
                 .map(|&(lat, lng)| proj.project(lat, lng))
                 .collect();
             if let Some(c) = compact {
+                let keep = obf.keep_clear().map(|k| keep_out(&k, proj));
                 for run in split_at_gaps(&projected, max_gap_units) {
-                    c.write(&mut d, run, false);
+                    match keep {
+                        Some(k) => c.write_clear_of(&mut d, run, k),
+                        None => c.write(&mut d, run, false),
+                    };
                 }
                 continue;
             }
@@ -715,6 +719,18 @@ fn points_to_path_string(pts: &[(f64, f64)]) -> String {
         let _ = write!(s, " L{:.2} {:.2}", x, y);
     }
     s
+}
+
+/// The home disk in viewbox units. Scaled at its poleward rim, where
+/// Mercator stretches most, so the disc covers the whole metric radius.
+fn keep_out(k: &KeepClear, proj: &Projection) -> KeepOut {
+    let rim_lat = k.lat + k.lat.signum() * (k.radius_m / 111_000.0);
+    let per_m = proj.units_per_meter_at(rim_lat);
+    KeepOut {
+        center: proj.project(k.lat, k.lng),
+        radius: k.radius_m * per_m,
+        slack: ZONE_SLACK_M * per_m,
+    }
 }
 
 /// Split a projected ride into runs wherever consecutive points sit
@@ -1308,15 +1324,10 @@ mod tests {
         eprintln!("render_smoke: svg size = {} bytes", svg.len());
     }
 
-    /// cycle.dunn.dev's landing render (`--theme cycle_heat --web
-    /// --transparent-bg --anonymize --obfuscation-radius-m 1000
-    /// --cycling --heat-alpha 4.0 --fit cover`) on the fixtures, held
-    /// to the 300 KB raw target at both crops. Measured 260 KB and
-    /// 286 KB when set.
-    #[test]
-    fn web_payload_stays_in_budget() {
-        let mut cfg = config::load("fixtures/config.toml").expect("config loads");
-        let theme = theme::load_named("cycle_heat", None).expect("theme loads");
+    /// The fixture config, basemap and rides, as cycle.dunn.dev renders
+    /// them: rides of at least 1 km.
+    fn fixture_rides() -> (ValidatedConfig, Basemap, Vec<Activity>) {
+        let cfg = config::load("fixtures/config.toml").expect("config loads");
         let mut basemap = osm::load("fixtures/grand-rapids.osm.json.gz").expect("osm loads");
         osm::filter::refine(&mut basemap);
         let raw = std::fs::read_to_string("fixtures/activities.json").expect("fixture");
@@ -1327,17 +1338,176 @@ mod tests {
                 ActivityType::Ride | ActivityType::EBikeRide
             ) && a.distance_m >= 1000.0
         });
+        (cfg, basemap, rides)
+    }
+
+    /// `--theme cycle_heat --web --transparent-bg --fit cover` at `r`.
+    fn web_render(
+        cfg: &ValidatedConfig,
+        basemap: &Basemap,
+        rides: &[Activity],
+        r: f64,
+        tuning: HeatTuning,
+    ) -> String {
+        let theme = theme::load_named("cycle_heat", None).expect("theme loads");
         let obf = obfuscation::apply(
-            rides,
+            rides.to_vec(),
             ObfuscationParams {
                 home_lat: cfg.home_lat,
                 home_lng: cfg.home_lng,
-                radius_m: 1000.0,
+                radius_m: r,
                 salt: cfg.privacy_salt.clone(),
                 offset_m: cfg.privacy_offset_m,
             },
         )
         .expect("obfuscate");
+        render(
+            cfg,
+            basemap,
+            &obf,
+            &theme,
+            false,
+            true,
+            true,
+            Fit::Cover,
+            tuning,
+        )
+        .expect("render ok")
+    }
+
+    /// The nearest any drawn heat segment of a `--web` render comes to
+    /// home, in metres: each path parsed back into viewbox points,
+    /// unprojected, and measured line by line, not only at vertices.
+    /// Returns the distance and how many segments were measured.
+    fn nearest_heat_segment_m(cfg: &ValidatedConfig, svg: &str) -> (f64, usize) {
+        let proj = Projection::fit_radius(
+            cfg.center_lat,
+            cfg.center_lng,
+            cfg.radius_m,
+            cfg.viewbox_width,
+            cfg.viewbox_height,
+            Fit::Cover,
+        )
+        .expect("projection");
+        let (hlat, hlng) = (cfg.home_lat, cfg.home_lng);
+        let to_local = |(lat, lng): (f64, f64)| {
+            let k = 6_371_000.0_f64;
+            (
+                (lng - hlng).to_radians() * k * hlat.to_radians().cos(),
+                (lat - hlat).to_radians() * k,
+            )
+        };
+        let (mut min, mut segments) = (f64::MAX, 0);
+        for chunk in heat_paths_inner(svg).split(" d=\"").skip(1) {
+            let d = &chunk[..chunk.find('"').expect("d close")];
+            for sub in crate::render::path::parse_d(d) {
+                let local: Vec<(f64, f64)> = sub
+                    .iter()
+                    .map(|&(x, y)| to_local(proj.unproject(x, y)))
+                    .collect();
+                for w in local.windows(2) {
+                    let (a, b) = (w[0], w[1]);
+                    let (dx, dy) = (b.0 - a.0, b.1 - a.1);
+                    let len2 = dx * dx + dy * dy;
+                    let t = if len2 > 0.0 {
+                        (-(a.0 * dx + a.1 * dy) / len2).clamp(0.0, 1.0)
+                    } else {
+                        0.0
+                    };
+                    min = min.min((a.0 + t * dx).hypot(a.1 + t * dy));
+                    segments += 1;
+                }
+            }
+        }
+        (min, segments)
+    }
+
+    /// The fixture rides with the fixture salt through `--web` at both
+    /// crops: no drawn segment comes within the radius of home.
+    #[test]
+    fn web_heat_segments_stay_outside_the_home_radius() {
+        let (mut cfg, basemap, rides) = fixture_rides();
+        for r in [cfg.obfuscation_radius_m, 1000.0] {
+            for (w, h) in [(1600, 900), (1200, 1600)] {
+                cfg.viewbox_width = w;
+                cfg.viewbox_height = h;
+                let svg = web_render(&cfg, &basemap, &rides, r, HeatTuning::default());
+                let (min, segments) = nearest_heat_segment_m(&cfg, &svg);
+                assert!(segments > 1000, "{w}x{h}: only {segments} segments");
+                assert!(
+                    min >= r,
+                    "{w}x{h} r={r}: a segment passes {min:.2} m from home"
+                );
+            }
+        }
+    }
+
+    /// The fixture salt's zone edge passes hundreds of metres outside
+    /// the home radius where the rides run, so the test above cannot
+    /// see a chord or a rounded vertex step inside it. Here, for salts
+    /// whose zone edge comes within 3 m of the home radius, a ride
+    /// circles the zone 2 m outside its edge, through the same writer.
+    #[test]
+    fn web_heat_hugging_the_zone_stays_outside_the_home_radius() {
+        let (mut cfg, basemap, _) = fixture_rides();
+        let r = cfg.obfuscation_radius_m;
+        let (hlat, hlng) = (cfg.home_lat, cfg.home_lng);
+        let k = 6_371_000.0_f64;
+        let mut checked = 0;
+        for i in 0..4000 {
+            let salt = obfuscation::PrivacySalt::new(&format!("synthetic-test-salt-{i:04}"));
+            cfg.privacy_salt = Some(salt.expect("salt"));
+            let (c, rz) = obfuscation::zone_disk(&ObfuscationParams {
+                home_lat: hlat,
+                home_lng: hlng,
+                radius_m: r,
+                salt: cfg.privacy_salt.clone(),
+                offset_m: cfg.privacy_offset_m,
+            });
+            let east = |lng: f64| (lng - hlng).to_radians() * k * hlat.to_radians().cos();
+            let offset = east(c.1).hypot((c.0 - hlat).to_radians() * k);
+            if rz - offset - r > 2.0 {
+                continue;
+            }
+            let ring: Vec<geo_types::Coord> = (0..=720)
+                .map(|step| {
+                    let a = (step as f64 / 2.0).to_radians();
+                    let rho = rz + 0.75;
+                    geo_types::Coord {
+                        x: c.1 + (rho * a.sin() / (k * c.0.to_radians().cos())).to_degrees(),
+                        y: c.0 + (rho * a.cos() / k).to_degrees(),
+                    }
+                })
+                .collect();
+            let polyline = polyline::encode_coordinates(ring, 5).expect("encode");
+            let rides = vec![synthetic_activity(1, polyline)];
+            for (w, h) in [(1600, 900), (1200, 1600)] {
+                cfg.viewbox_width = w;
+                cfg.viewbox_height = h;
+                let svg = web_render(&cfg, &basemap, &rides, r, HeatTuning::default());
+                let (min, segments) = nearest_heat_segment_m(&cfg, &svg);
+                assert!(segments > 10, "salt {i} {w}x{h}: only {segments} segments");
+                assert!(
+                    min >= r,
+                    "salt {i} {w}x{h}: a segment passes {min:.2} m from home"
+                );
+            }
+            checked += 1;
+            if checked == 6 {
+                break;
+            }
+        }
+        assert_eq!(checked, 6, "too few salts put the zone edge near home");
+    }
+
+    /// cycle.dunn.dev's landing render (`--theme cycle_heat --web
+    /// --transparent-bg --anonymize --obfuscation-radius-m 1000
+    /// --cycling --heat-alpha 4.0 --fit cover`) on the fixtures, held
+    /// to the 300 KB raw target at both crops. Measured 260 KB and
+    /// 286 KB when set.
+    #[test]
+    fn web_payload_stays_in_budget() {
+        let (mut cfg, basemap, rides) = fixture_rides();
         let tuning = HeatTuning {
             alpha: 4.0,
             anonymize: true,
@@ -1346,20 +1516,10 @@ mod tests {
         for (w, h, budget) in [(1600, 900, 300_000), (1200, 1600, 300_000)] {
             cfg.viewbox_width = w;
             cfg.viewbox_height = h;
-            let svg = render(
-                &cfg,
-                &basemap,
-                &obf,
-                &theme,
-                false,
-                true,
-                true,
-                Fit::Cover,
-                tuning,
-            )
-            .expect("render ok");
+            let svg = web_render(&cfg, &basemap, &rides, 1000.0, tuning);
             assert!(svg.contains("class=\"heat\""), "{w}x{h}: heat missing");
             assert!(svg.contains("class=\"water\""), "{w}x{h}: water missing");
+            eprintln!("web_payload: {w}x{h} = {} bytes", svg.len());
             assert!(
                 svg.len() <= budget,
                 "{w}x{h}: {} bytes, over the {budget} byte budget",
