@@ -1,5 +1,62 @@
 # Changelog
 
+## v0.2.0 -- privacy zone no longer outlines home
+
+### Breaking
+- Any render with an obfuscation radius above 0 now requires
+  `[privacy] salt` (or `PATINATE_PRIVACY__SALT`): at least 16
+  characters, kept private, never changed. Generate one with
+  `openssl rand -hex 16`. Without it the render stops with an error
+  naming the key. Radius 0 and the non-render commands need no salt.
+- New `[privacy] offset_m`, default 750, minimum 250 for any positive
+  radius. A non-finite or negative radius is now refused.
+- Contributors: the Makefile is replaced by a justfile, pinned with
+  `just` and git-lfs in `mise.toml`.
+- The published crate no longer ships fixtures, `web/`, assets or
+  examples.
+
+### Security
+- v0.1.x clipped every track at one exact circle around home, so the
+  cut ends outlined it. A circle fit recovered home to within metres
+  from the SVG, and to about 40 m even from a PNG. The hidden zone is
+  now offset from home in a salted, secret direction, and each cut end
+  is trimmed a further salted distance along the track. Renders that
+  share a salt share one zone centre, so renders at different radii
+  cannot be intersected.
+- Residual: tracks still converge toward home, and a determined
+  analyst can narrow it to roughly 100-250 m.
+- Upgrading and re-rendering is strongly recommended. Replace any
+  render published with v0.1.x.
+- `--web` simplification and coordinate rounding can no longer draw a
+  line inside the home radius.
+- The zone derivation is pinned by golden tests, so a dependency
+  update cannot silently move a salt's zone.
+- The cache, which holds the Strava refresh token, and patinate's data
+  directory are created owner-only (0600 and 0700), and existing ones
+  are tightened.
+
+### Added
+- `--fit cover` fills a viewbox of any aspect by cropping the long
+  axis. `contain` stays the default.
+- `heat.blend` theme field (normal, multiply or screen). The default
+  multiplies on a light ground and screens on a dark one, by luminance.
+- The heat glow is a `<use>` stack over one path group, not three
+  copies of every path. Posters shrink by about a third.
+- `--web` writes compact, merged paths sized to the viewbox and drops
+  streams, keeping rivers and canals.
+- Fixtures are now fully synthetic, with the OSM basemap in git LFS.
+  Examples and `render_smoke` run from a fresh clone.
+
+### Fixed
+- Equal-sized road components rank deterministically, so two renders
+  of the same input keep the same roads.
+- `fetch-osm` accepts negative coordinates.
+- The Overpass User-Agent reports the crate's real version.
+
+### Changed
+- oauth2 no longer pulls in a second HTTP client and TLS stack.
+- Dependencies refreshed.
+
 ## v0.1.1 -- darwin build fix
 
 ### Fixed
