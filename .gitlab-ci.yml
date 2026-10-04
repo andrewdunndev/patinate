@@ -180,3 +180,11 @@ cargo-build:
     paths:
       - target/release/patinate
     expire_in: 1 week
+
+# TEMPORARY (test branch only, never merged): run the release cross-builds
+# on this branch, build step only, to prove the darwin link before re-tagging.
+package:
+  rules:
+    - when: on_success
+  script:
+    - $BUILD_CMD build --release --locked --target "$TARGET"
