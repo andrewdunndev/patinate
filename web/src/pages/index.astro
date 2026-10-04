@@ -44,14 +44,17 @@ import Layout from '../layouts/Layout.astro';
       activities API one page at a time at human pace and only pulls
       what's new since last time. <code>render</code> reads all
       three caches and composes the poster — no network calls, no
-      surprises, theme picked by flag.
+      surprises, theme picked by flag. Before the first render, set
+      a private <code>[privacy] salt</code> in the config
+      (<code>openssl rand -hex 16</code>); it seeds the hidden zone's
+      offset and has to stay stable.
     </p>
     <div class="tile-grid">
       <div class="tile">
         <p class="tile-eyebrow">flow · in</p>
         <p class="tile-headline">activities</p>
         <p class="tile-prose">
-          Strava OAuth → polyline + segments + timestamps. Incremental
+          Strava OAuth → polyline + timestamps. Incremental
           sync (only new activities since the last run), cached
           locally as JSON. OSM basemap fetched once per city and
           pinned by tile-bbox hash.
@@ -62,12 +65,12 @@ import Layout from '../layouts/Layout.astro';
         <p class="tile-eyebrow">discipline · posture</p>
         <p class="tile-headline">private</p>
         <p class="tile-prose">
-          Routes stop at a zone offset from home by a secret amount,
-          edges trimmed. Tracks still converge toward home: an analyst
+          Routes stop at a zone offset from home by a secret amount
+          (<code>offset_m</code>, default 750 m, floor 250), edges trimmed. Tracks still converge toward home: an analyst
           can narrow it to roughly 100-250 m; a larger radius adds only
           modest cover. The bundled fixture is fully synthetic.
         </p>
-        <p class="tile-meta">circle-obfuscate · 1km+ default</p>
+        <p class="tile-meta">circle-obfuscate · salted</p>
       </div>
       <div class="tile">
         <p class="tile-eyebrow">flow · out</p>
@@ -184,7 +187,7 @@ import Layout from '../layouts/Layout.astro';
           on macOS). No external runtime deps. Best for contributors
           and anyone who already runs Rust for other work.
         </p>
-        <p class="tile-meta">rust 1.75+ · resvg · cc required</p>
+        <p class="tile-meta">rust 1.85+ · resvg · cc required</p>
       </div>
       <div class="tile">
         <p class="tile-eyebrow">option b</p>
@@ -224,7 +227,8 @@ import Layout from '../layouts/Layout.astro';
       what you do with it (frame it, print it, embed it on a page
       that refreshes every Sunday) is up to you. The
       <code>--web --transparent-bg</code> flags exist precisely so a
-      scheduled run can drop a fresh SVG into a site's static assets.
+      scheduled run can drop a fresh SVG into a site's static assets;
+      add <code>--fit cover</code> to fill a wide hero frame.
     </p>
     <p class="section-prose">
       If your activities live somewhere else, or if you're happy
