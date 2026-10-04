@@ -1,10 +1,9 @@
 [toolchain]
 channel = "1.98.1"
 components = ["rustfmt", "clippy"]
-# Targets must be listed here so rustup provisions them when this
-# toolchain.toml triggers a fresh toolchain install (e.g. inside the
-# nomograph rust-cli CI image, which prepares the targets for its
-# default toolchain but rustup downloads a fresh 1.94.0 to honor
-# this file). Without this line the cross-compile to darwin fails
-# with "the aarch64-apple-darwin target may not be installed."
-targets = ["aarch64-apple-darwin"]
+# Every release cross-compile target must be listed here. The CI image
+# prepares targets for its own default toolchain, but rustup installs a
+# fresh toolchain to honor this file, without those targets. An unlisted
+# target fails with "can't find crate for `core`" or "target may not be
+# installed".
+targets = ["aarch64-apple-darwin", "aarch64-unknown-linux-gnu"]
