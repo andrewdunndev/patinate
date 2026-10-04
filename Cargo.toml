@@ -64,7 +64,7 @@ chrono = { version = "0.4", features = ["serde"] }
 subtle = "2"
 
 # keyed PRF seeding the privacy zone (already in the tree via oauth2)
-sha2 = "0.10"
+sha2 = "0.11"
 
 # gzip decode for OSM fixtures (fetch-osm output is gzipped)
 flate2 = "1"
