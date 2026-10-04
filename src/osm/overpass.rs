@@ -457,4 +457,21 @@ mod tests {
         let msg = format!("{err:#}");
         assert!(msg.contains("not a number"), "got: {msg}");
     }
+
+    /// Live TLS check for the ring provider and the platform verifier:
+    /// the Overpass status page loads, an expired certificate is refused.
+    #[tokio::test]
+    #[ignore = "needs the network"]
+    async fn https_verifies_with_ring_provider() {
+        let _ = rustls::crypto::ring::default_provider().install_default();
+        let client = http_client().expect("client builds");
+        let status = client
+            .get("https://overpass-api.de/api/status")
+            .send()
+            .await
+            .expect("overpass status over verified TLS");
+        assert!(status.status().is_success(), "got {}", status.status());
+        let expired = client.get("https://expired.badssl.com/").send().await;
+        assert!(expired.is_err(), "expired certificate was accepted");
+    }
 }
