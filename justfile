@@ -5,6 +5,7 @@ config := "fixtures/config.toml"
 osm := "fixtures/grand-rapids.osm.json.gz"
 activities := "fixtures/activities.json"
 scratch := "target/render"
+shipped := "noir_heat blueprint_heat warm_beige cycle_heat newsprint verdigris"
 # The committed assets render from fixtures/config.toml alone. config::load
 # merges $XDG_CONFIG_HOME/patinate/config.toml and PATINATE_*__* over it,
 # which would carry a real home and salt into public files, so each render
@@ -52,12 +53,12 @@ example: _fixture-env release
     test -s assets/example-gallery.png
     echo "Wrote assets/example-noir.png and assets/example-gallery.png"
 
-# render the four theme previews into assets/themes
+# render the theme previews into assets/themes
 themes: _fixture-env release
     #!/usr/bin/env bash
     set -euo pipefail
     mkdir -p assets/themes {{scratch}}
-    for theme in noir_heat blueprint_heat warm_beige cycle_heat; do
+    for theme in {{shipped}}; do
         echo "render theme preview $theme"
         {{render}} --theme "$theme" --heat-bloom 1.8 --heat-alpha 2.5 \
             --out "{{scratch}}/theme-$theme.svg" >/dev/null
@@ -71,13 +72,20 @@ site: _fixture-env release
     {{render}} --theme cycle_heat --web --transparent-bg --out public/heatmap-web.svg
     cp examples/site/index.html public/index.html
 
-# refresh the committed heatmap and images that web/ serves
-web: _fixture-env example themes
+# refresh the press's live plate and the gallery plates web/ serves
+web: _fixture-env release
     #!/usr/bin/env bash
     set -euo pipefail
+    mkdir -p web/public/plates {{scratch}}
     {{render}} --theme cycle_heat --web --transparent-bg --out web/public/heatmap-web.svg
-    cp assets/example-noir.png assets/example-gallery.png web/public/
-    for f in assets/themes/*.png; do cp "$f" "web/public/theme-$(basename "$f")"; done
+    for theme in {{shipped}}; do
+        echo "render plate $theme"
+        {{render}} --theme "$theme" --heat-bloom 1.8 --heat-alpha 2.5 \
+            --out "{{scratch}}/plate-$theme.svg" >/dev/null
+        rsvg-convert -w 1200 "{{scratch}}/plate-$theme.svg" -o "{{scratch}}/plate-$theme.png"
+        magick "{{scratch}}/plate-$theme.png" -resize 600x -quality 78 "web/public/plates/$theme.webp"
+    done
+    magick "{{scratch}}/plate-noir_heat.png" -resize 960x -quality 80 web/public/plates/hero.webp
 
 # run the rasterizing tests (need rsvg-convert on PATH)
 check-pixels:
