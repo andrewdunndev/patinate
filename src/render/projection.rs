@@ -144,6 +144,21 @@ impl Projection {
     pub fn project_latlon(&self, p: LatLon) -> (f64, f64) {
         self.project(p.lat, p.lon)
     }
+
+    /// Viewbox units per meter at `lat`, on the 6,371 km sphere the
+    /// obfuscation pipeline measures its radii on.
+    pub fn units_per_meter_at(&self, lat: f64) -> f64 {
+        self.scale / (6_371_000.0 * lat.to_radians().cos())
+    }
+
+    /// Inverse of `project`.
+    #[cfg(test)]
+    pub fn unproject(&self, x: f64, y: f64) -> (f64, f64) {
+        let mx = x / self.scale + self.min_mx;
+        let my = (self.viewbox_h - y) / self.scale + self.min_my;
+        let lat = 2.0 * my.exp().atan() - std::f64::consts::FRAC_PI_2;
+        (lat.to_degrees(), mx.to_degrees())
+    }
 }
 
 /// Web Mercator forward projection. Output is in radians-on-a-unit-sphere

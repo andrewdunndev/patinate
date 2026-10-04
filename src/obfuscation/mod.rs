@@ -106,6 +106,20 @@ pub struct ObfuscationParams {
     pub salt: Option<PrivacySalt>,
 }
 
+/// How far, in metres, every kept segment clears the home disk: the
+/// zone's radius exceeds the farthest its edge can sit from home by
+/// this much.
+pub const ZONE_SLACK_M: f64 = 1.0;
+
+/// The home disk of the configured radius. Every kept segment clears
+/// it by `ZONE_SLACK_M`.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct KeepClear {
+    pub lat: f64,
+    pub lng: f64,
+    pub radius_m: f64,
+}
+
 /// An activity that has passed obfuscation. Carries the wrapped
 /// `Activity` plus the clipped polyline split into 0+ outside-only
 /// segments as `(lat, lng)` pairs. The renderer consumes
@@ -115,6 +129,7 @@ pub struct ObfuscationParams {
 pub struct ObfuscatedActivity {
     activity: Activity,
     clipped_segments: Vec<Vec<(f64, f64)>>,
+    keep_clear: Option<KeepClear>,
 }
 
 impl ObfuscatedActivity {
@@ -127,6 +142,12 @@ impl ObfuscatedActivity {
     /// stroke as a single sub-path.
     pub fn segments(&self) -> &[Vec<(f64, f64)>] {
         &self.clipped_segments
+    }
+
+    /// The disk every segment clears, `None` when obfuscation is off.
+    /// Anything that moves lines after the clip must keep them out.
+    pub fn keep_clear(&self) -> Option<KeepClear> {
+        self.keep_clear
     }
 }
 
@@ -154,10 +175,11 @@ impl<'a> HiddenZone<'a> {
         );
         // Sized for the largest possible offset, not the drawn one, so
         // the radius says nothing about where home sits inside the
-        // disk. The 1 m covers bisection slack.
+        // disk. The slack covers bisection error and leaves the renderer
+        // room to quantize.
         Self {
             center,
-            radius_m: params.radius_m + params.offset_m + 1.0,
+            radius_m: params.radius_m + params.offset_m + ZONE_SLACK_M,
             max_trim_m: params.radius_m,
             salt,
         }
@@ -210,13 +232,31 @@ pub fn apply(
     } else {
         None
     };
+    let keep_clear = zone.is_some().then_some(KeepClear {
+        lat: params.home_lat,
+        lng: params.home_lng,
+        radius_m: params.radius_m,
+    });
     Ok(activities
         .into_iter()
-        .filter_map(|a| build_obfuscated(a, zone.as_ref()))
+        .filter_map(|a| build_obfuscated(a, zone.as_ref(), keep_clear))
         .collect())
 }
 
-fn build_obfuscated(activity: Activity, zone: Option<&HiddenZone>) -> Option<ObfuscatedActivity> {
+/// The hidden zone's centre and radius, for render tests that lay
+/// lines along its edge.
+#[cfg(test)]
+pub(crate) fn zone_disk(params: &ObfuscationParams) -> ((f64, f64), f64) {
+    let salt = params.salt.as_ref().expect("salt");
+    let z = HiddenZone::derive(params, salt);
+    (z.center, z.radius_m)
+}
+
+fn build_obfuscated(
+    activity: Activity,
+    zone: Option<&HiddenZone>,
+    keep_clear: Option<KeepClear>,
+) -> Option<ObfuscatedActivity> {
     // No polyline: fall back to start-point distance. A polyline-less
     // activity can't be split, so the only honest behavior is to drop
     // it when it starts inside the zone.
@@ -227,6 +267,7 @@ fn build_obfuscated(activity: Activity, zone: Option<&HiddenZone>) -> Option<Obf
         return Some(ObfuscatedActivity {
             activity,
             clipped_segments: Vec::new(),
+            keep_clear,
         });
     }
 
@@ -255,6 +296,7 @@ fn build_obfuscated(activity: Activity, zone: Option<&HiddenZone>) -> Option<Obf
     Some(ObfuscatedActivity {
         activity,
         clipped_segments: segments,
+        keep_clear,
     })
 }
 
