@@ -38,7 +38,13 @@ pub const NOMINATIM_ENDPOINT: &str = "https://nominatim.openstreetmap.org/search
 
 /// User-Agent string sent on every outbound request. Both Overpass
 /// and Nominatim ask for a descriptive UA pointing at the source.
-pub const USER_AGENT: &str = "patinate/0.1.0 (https://gitlab.com/dunn.dev/patinate)";
+pub const USER_AGENT: &str = concat!(
+    "patinate/",
+    env!("CARGO_PKG_VERSION"),
+    " (",
+    env!("CARGO_PKG_REPOSITORY"),
+    ")"
+);
 
 /// All inputs needed to fetch + write a basemap fixture.
 #[derive(Debug, Clone)]
