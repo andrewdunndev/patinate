@@ -104,7 +104,7 @@ function apply(svg: SVGSVGElement, s: State) {
   }
 
   attr(q('.heat-stack'), { stroke: h.color });
-  const bloom = s.web ? 1 : s.bloom;
+  const bloom = s.bloom;
   const halo = (a: number) => Math.min(1, a * bloom * (s.web ? WEB_GLOW : 1));
   const outer = q('.heat-outer') as SVGElement, inner = q('.heat-inner') as SVGElement, core = q('.heat-core') as SVGElement;
   attr(outer, { 'stroke-width': h.width * (h.glow_outer_ratio ?? GLOW.outer_ratio) * bloom, 'stroke-opacity': halo(h.glow_outer_alpha ?? GLOW.outer_alpha) });
@@ -141,8 +141,7 @@ export function command(s: State, name: string, needsDir: boolean): string {
   if (s.web) parts.push('--web');
   if (!s.basemap) parts.push('--heat-only');
   if (!s.paper) parts.push('--transparent-bg');
-  // --heat-bloom is never printed with --web.
-  if (!s.web && s.bloom !== 1) parts.push('--heat-bloom ' + s.bloom);
+  if (s.bloom !== 1) parts.push('--heat-bloom ' + s.bloom);
   if (s.alpha !== 1) parts.push('--heat-alpha ' + s.alpha);
   parts.push(...CROPS[s.crop].flags);
   if (s.anonymize) parts.push('--anonymize');
@@ -311,8 +310,6 @@ export async function startPress() {
     document.querySelectorAll<HTMLElement>('#toggles .chip').forEach((b) => {
       b.setAttribute('aria-pressed', String(s[b.dataset.toggle as 'web' | 'basemap' | 'paper' | 'anonymize']));
     });
-    $<HTMLInputElement>('#heat-bloom').disabled = s.web;
-    $('#bloom-note').hidden = !s.web;
   }
 
   function load(name: string) {
