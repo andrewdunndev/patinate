@@ -1040,6 +1040,31 @@ mod tests {
         assert!(sd > 0.2 * 250.0, "trim spread {sd:.1} m across activities");
     }
 
+    /// Golden values for one fixed salt. Users keep one salt for life,
+    /// and two different zones for the same salt intersect and narrow
+    /// down home. If this fails, the derivation changed (a sha2 bump, a
+    /// refactor of `unit`, `derive` or `trim_m`) and every user's zone
+    /// moves on their next render: a breaking privacy change. Never
+    /// "fix" it by updating the constants; restore the derivation.
+    #[test]
+    fn zone_derivation_is_pinned() {
+        let s = salt();
+        let z = HiddenZone::derive(&params(250.0, s.clone()), &s);
+        let (east, north) = to_local(z.center);
+        assert!((east - -284.876_060_641).abs() < 1e-6, "east {east:.9}");
+        assert!((north - 636.162_868_423).abs() < 1e-6, "north {north:.9}");
+        assert_eq!(z.radius_m, 1001.0);
+        for (id, crossing, want) in [
+            (1, 0, 120.558_801_149),
+            (2, 0, 135.839_880_852),
+            (1, 1, 53.848_230_753),
+            (9_876_543_210, 3, 249.816_786_207),
+        ] {
+            let got = z.trim_m(id, crossing);
+            assert!((got - want).abs() < 1e-6, "trim({id}, {crossing}) {got:.9}");
+        }
+    }
+
     #[test]
     fn no_output_vertex_within_radius_of_home() {
         // I1 over many salts and radii, on routes that start at the
