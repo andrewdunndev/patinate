@@ -200,17 +200,18 @@ Generic figment override: `PATINATE_<SECTION>__<KEY>`. Example:
 - **No JS interactivity layer.** `data-*` attrs are emitted; the
   markup is intentionally inert.
 - **No tiled basemap.** Re-fetch OSM when you move or change radius.
-- **No schema migrations.** Delete `~/.cache/patinate/cache.db` and
-  re-sync after a version bump that changes the schema.
+- **No schema migrations.** After a schema-changing bump, delete
+  `cache.db` and re-sync. It sits in `~/.local/share/patinate/` (Linux),
+  `~/Library/Application Support/dev.dunn.patinate/` (macOS) or
+  `%APPDATA%\dunn\patinate\data\` (Windows).
 - **Sync is at-least-once on partial failure.** The watermark only
   advances after a full successful sweep; idempotent upserts cover it.
 - **No antimeridian handling.** Cities within
   `radius_m / (111km * cos(lat))` of ±180° produce a degenerate frame.
 - **No viewport culling.** OSM basemap renders in full regardless of
   `--radius-m`; rasterize for a tight file-size budget.
-- **Strava rate limits:** 429 honors `Retry-After` once (60s cap).
-- **Overpass rate limits:** 429/5xx bails immediately. Use
-  `PATINATE_OVERPASS_ENDPOINT` for a private mirror.
+- **Rate limits:** a Strava 429 honors `Retry-After` once (60s cap);
+  Overpass 429/5xx bails. `PATINATE_OVERPASS_ENDPOINT` takes a mirror.
 - **No JSON-log conventions.** `tracing` keys are ad-hoc.
 
 </details>
@@ -225,9 +226,8 @@ polyline-circle clipping. `svg` crate for output. `oauth2` and
 `polyline` crate for decode. No JS runtime, no headless browser, no
 external rasterizer at render time.
 
-44 lib tests including a load-bearing privacy invariant test
-(`apply_privacy_invariant_loop_through_home`) and an end-to-end SVG
-validity test on synthetic input.
+Tests include a load-bearing privacy invariant
+(`apply_privacy_invariant_loop_through_home`) and an end-to-end SVG test.
 
 </details>
 
