@@ -1,0 +1,94 @@
+---
+import Layout from '../layouts/Layout.astro';
+import { editions } from '../data/themes';
+
+const themes = JSON.stringify(editions.map((e) => e.theme));
+const inks = [
+  ['paper', 'bg', 'paper'], ['roads', 'roads', 'road ink'], ['water', 'water', 'water'],
+  ['parks', 'parks', 'parks'], ['heat', 'heat', 'heat ink'], ['text', 'text', 'text'],
+];
+---
+<Layout title="Press" description="The patinate press: try the six themes and the render flags live on the Grand Rapids sample, then copy the command or save the theme JSON.">
+  <div class="section-head page-head">
+    <p class="stamp">the press</p>
+    <h1>Change the inks. Read the command.</h1>
+    <p class="lede">The Grand Rapids sample, live. Every control changes the proof in place, and the command under it reproduces the proof with flags the renderer has today.</p>
+  </div>
+
+  <div class="press">
+    <div class="bench">
+      <div class="proof-meta">
+        <span class="stamp" id="proof-label">theme · loading</span>
+        <span class="stamp" id="proof-count"></span>
+      </div>
+      <div class="pull">
+        <span class="marks"></span>
+        <div class="proof" id="proof"><div class="loading">inking the plate…</div></div>
+      </div>
+      <div class="inkbar" id="proof-inkbar" aria-hidden="true"></div>
+      <pre class="cmdline copyable" id="cmd" aria-live="polite"><code></code></pre>
+      <p class="hint">The proof is <code>fixtures/activities.json</code> rendered once with <code>--web --transparent-bg</code> and re-inked in your browser. It has no minor roads, and its text plate is drawn by this page. A real render draws its own.</p>
+    </div>
+
+    <form class="controls" id="controls" onsubmit="return false">
+      <fieldset>
+        <legend>theme</legend>
+        <select class="select" id="edition" aria-label="Theme"></select>
+        <p class="hint">All six ship in the binary. Edit any ink and the theme becomes <code>&lt;name&gt;_proof</code>, loaded with <code>--themes-dir</code>.</p>
+      </fieldset>
+
+      <fieldset>
+        <legend>inks <span class="tag">theme JSON</span></legend>
+        {inks.map(([id, key, label]) => (
+          <div class="row inkrow"><label for={`ink-${id}`}>{label}</label><code id={`v-${id}`}></code><input type="color" id={`ink-${id}`} data-ink={key} /></div>
+        ))}
+        <p class="hint">Road ink sets the motorway tier; the five lower tiers are mixed toward the paper.</p>
+      </fieldset>
+
+      <fieldset>
+        <legend>heat</legend>
+        <div class="row"><label for="heat-width">stroke width <span class="tag">theme JSON</span></label><output id="o-width">0.90</output><input type="range" id="heat-width" min="0.3" max="2" step="0.05" value="0.9" /></div>
+        <div class="row"><label for="heat-alpha">core alpha <span class="tag flag">--heat-alpha</span></label><output id="o-alpha">1.0</output><input type="range" id="heat-alpha" min="0.2" max="3" step="0.1" value="1" /></div>
+        <div class="row"><label for="heat-bloom">bloom <span class="tag flag">--heat-bloom</span></label><output id="o-bloom">1.0</output><input type="range" id="heat-bloom" min="0" max="3" step="0.1" value="1" /></div>
+      </fieldset>
+
+      <fieldset>
+        <legend>output</legend>
+        <div class="chips" id="toggles">
+          <button type="button" class="chip" data-toggle="web">--web</button>
+          <button type="button" class="chip" data-toggle="basemap">basemap</button>
+          <button type="button" class="chip" data-toggle="paper">paper</button>
+          <button type="button" class="chip" data-toggle="anonymize">--anonymize</button>
+        </div>
+        <p class="hint">Basemap off prints <code>--heat-only</code>; paper off prints <code>--transparent-bg</code>. <code>--anonymize</code> changes no pixels; it strips the attributes and coordinates a published SVG would carry.</p>
+      </fieldset>
+
+      <fieldset>
+        <legend>activities <span class="tag flag">--type</span></legend>
+        <div class="chips" id="types"><span class="hint">reading the plate…</span></div>
+      </fieldset>
+
+      <fieldset>
+        <legend>crop <span class="tag">page-side preview</span></legend>
+        <div class="chips" id="crops"></div>
+        <p class="hint">The page reframes the plate. The printed <code>--viewbox-*</code> and <code>--fit</code> flags give the same frame, and the renderer sets the text plate for it.</p>
+      </fieldset>
+
+      <fieldset>
+        <legend>save</legend>
+        <div class="actions">
+          <button type="button" class="btn primary small" id="pull-png">Proof · PNG <span class="tag">page-side</span></button>
+          <button type="button" class="btn small" id="save-json">Theme · JSON</button>
+          <button type="button" class="btn small" id="reset">Reset</button>
+        </div>
+        <p class="hint" id="pull-status">The PNG is this page's proof at 2400 px wide, not renderer output.</p>
+      </fieldset>
+    </form>
+  </div>
+
+  <script type="application/json" id="press-themes" set:html={themes}></script>
+  <script>
+    import { startPress } from '../scripts/press';
+    startPress();
+  </script>
+</Layout>

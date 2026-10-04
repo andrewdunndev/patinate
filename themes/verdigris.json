@@ -1,0 +1,52 @@
+{
+  "name": "verdigris",
+  "bg": "#1a1d1a",
+  "text": "#d8e4d8",
+  "water": "#121614",
+  "parks": "#222a22",
+  "water_line_width": 1.2,
+  "road_motorway": {
+    "color": "#b89a6a",
+    "width": 1.4
+  },
+  "road_trunk": {
+    "color": "#9c8358",
+    "width": 1.1
+  },
+  "road_primary": {
+    "color": "#7e6a46",
+    "width": 0.85
+  },
+  "road_secondary": {
+    "color": "#5e4f36",
+    "width": 0.6
+  },
+  "road_tertiary": {
+    "color": "#433a2a",
+    "width": 0.4
+  },
+  "road_residential": {
+    "color": "#2e2820",
+    "width": 0.28
+  },
+  "heat": {
+    "color": "#3fc49a",
+    "width": 0.9,
+    "alpha": 0.5,
+    "glow_outer_ratio": 3.5,
+    "glow_outer_alpha": 0.12,
+    "glow_inner_ratio": 1.7,
+    "glow_inner_alpha": 0.22,
+    "blend": "screen"
+  },
+  "fade_top": {
+    "from": "#1a1d1a",
+    "to": "transparent",
+    "height_pct": 0
+  },
+  "fade_bottom": {
+    "from": "#1a1d1a",
+    "to": "transparent",
+    "height_pct": 0
+  }
+}

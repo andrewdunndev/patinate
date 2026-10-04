@@ -12,9 +12,8 @@ accumulate into brighter color the way actual patina builds on metal.
 
 ![Grand Rapids, three themes: noir_heat, blueprint_heat, warm_beige](assets/example-gallery.png)
 
-The gallery above is the bundled `fixtures/activities.json`: seeded
-random walks over the Grand Rapids road graph, fully synthetic. The
-repo ships zero real-rider data.
+The gallery is `fixtures/activities.json`: seeded random walks over
+the Grand Rapids road graph. The repo ships no real-rider data.
 
 ## Quickstart
 
@@ -48,6 +47,7 @@ build from source.) Build needs a C compiler (`build-essential` /
    home_lat             = 42.9999  # YOUR home, not the map center
    home_lng             = -85.9999
    obfuscation_radius_m = 1000     # 1000m+ for anything you publish
+   salt                 = "..."    # openssl rand -hex 16; never change it
 
    [strava]
    client_id     = "12345"
@@ -100,7 +100,7 @@ It also warns when `[general]` center sits within the radius plus
 
 ## Themes
 
-Four themes baked into the binary. `--themes-dir <dir>` adds custom
+Six themes baked into the binary. `--themes-dir <dir>` adds custom
 `*.json` themes alongside. The heat core multiplies on a light `bg`
 and screens on a dark one; `heat.blend` (`normal`, `multiply`,
 `screen`) pins it.
@@ -108,9 +108,11 @@ and screens on a dark one; `heat.blend` (`normal`, `multiply`,
 | Preview | Theme | Palette | Use when |
 |---|---|---|---|
 | ![noir_heat](assets/themes/noir_heat.png) | `noir_heat` | Black background, white road hierarchy, hot orange heat. | Strava-classic, default poster. |
-| ![blueprint_heat](assets/themes/blueprint_heat.png) | `blueprint_heat` | Deep blueprint blue, cyan tracks. | Engineering-doc aesthetic. |
+| ![blueprint_heat](assets/themes/blueprint_heat.png) | `blueprint_heat` | Deep blueprint blue, pale roads, amber heat. | Engineering-doc aesthetic. |
 | ![warm_beige](assets/themes/warm_beige.png) | `warm_beige` | Cream paper, sepia roads, terracotta heat. | Print output. |
 | ![cycle_heat](assets/themes/cycle_heat.png) | `cycle_heat` | Paper palette + steel-blue heat. | Inline web hero on a light page. |
+| ![newsprint](assets/themes/newsprint.png) | `newsprint` | Letterpress black on gray stock, red heat. | A print that reads like a page. |
+| ![verdigris](assets/themes/verdigris.png) | `verdigris` | Bronze roads on a dark green ground, verdigris heat. | A dark print for a frame. |
 
 <details>
 <summary><strong>Render flag reference</strong></summary>
@@ -198,21 +200,19 @@ Generic figment override: `PATINATE_<SECTION>__<KEY>`. Example:
 - **No JS interactivity layer.** `data-*` attrs are emitted; the
   markup is intentionally inert.
 - **No tiled basemap.** Re-fetch OSM when you move or change radius.
-- **No schema migrations.** Delete `~/.cache/patinate/cache.db` and
-  re-sync after a version bump that changes the schema.
+- **No schema migrations.** After a schema-changing bump, delete
+  `cache.db` and re-sync. It sits in `~/.local/share/patinate/` (Linux),
+  `~/Library/Application Support/dev.dunn.patinate/` (macOS) or
+  `%APPDATA%\dunn\patinate\data\` (Windows).
 - **Sync is at-least-once on partial failure.** The watermark only
   advances after a full successful sweep; idempotent upserts cover it.
 - **No antimeridian handling.** Cities within
   `radius_m / (111km * cos(lat))` of ±180° produce a degenerate frame.
 - **No viewport culling.** OSM basemap renders in full regardless of
   `--radius-m`; rasterize for a tight file-size budget.
-- **Strava rate limits:** 429 honors `Retry-After` once (60s cap).
-- **Overpass rate limits:** 429/5xx bails immediately. Use
-  `PATINATE_OVERPASS_ENDPOINT` for a private mirror.
+- **Rate limits:** a Strava 429 honors `Retry-After` once (60s cap);
+  Overpass 429/5xx bails. `PATINATE_OVERPASS_ENDPOINT` takes a mirror.
 - **No JSON-log conventions.** `tracing` keys are ad-hoc.
-- **`--web` is a preset, not a separate renderer.** Drops typography,
-  minor road tiers and streams, lightens the glow, compacts paths. Pair
-  with `--transparent-bg` for inline embeds.
 
 </details>
 
@@ -226,9 +226,8 @@ polyline-circle clipping. `svg` crate for output. `oauth2` and
 `polyline` crate for decode. No JS runtime, no headless browser, no
 external rasterizer at render time.
 
-44 lib tests including a load-bearing privacy invariant test
-(`apply_privacy_invariant_loop_through_home`) and an end-to-end SVG
-validity test on synthetic input.
+Tests include a load-bearing privacy invariant
+(`apply_privacy_invariant_loop_through_home`) and an end-to-end SVG test.
 
 </details>
 

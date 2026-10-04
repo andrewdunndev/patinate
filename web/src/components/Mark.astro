@@ -1,0 +1,15 @@
+---
+// patinate's mark: three plates in register, one route across the
+// front plate. No circle and no point: a ring on a map is the thing
+// this project works never to imply.
+interface Props { size?: number; label?: string; reversed?: boolean }
+const { size, label, reversed = false } = Astro.props;
+---
+<svg viewBox="0 0 32 32" width={size} height={size} role={label ? 'img' : undefined} aria-label={label} aria-hidden={label ? undefined : 'true'}>
+  <g fill="none" stroke="currentColor" stroke-width="1.5">
+    <rect x="2" y="10" width="20" height="20" rx="1.5" />
+    <rect x="7" y="5.5" width="20" height="20" rx="1.5" opacity=".55" />
+    <rect x="12" y="1" width="18" height="18" rx="1.5" opacity=".3" />
+  </g>
+  <path d="M5 25C9 22 8 16 13 17S18 23 22 18" fill="none" stroke={reversed ? 'currentColor' : 'var(--accent)'} stroke-width="2.2" stroke-linecap="round" />
+</svg>

@@ -1,206 +1,222 @@
-/* patinate chrome — canonical estate chrome from @dunn.dev/reference.
-   The palette stays on the estate tokens (moss accent, white bg) for
-   full conformance with tutti and bairn. Everything below is patinate's
-   own bespoke surface treatments layered on the canonical base:
-   (1) Cormorant Garamond on the hero title, an editorial nod from the
-   earlier print-plate site; (2) the .diagram.print-frame dark backing
-   around the live heatmap embed; (3) the .tile.theme-tile gallery
-   bleed; (4) the .filter-chips strip; (5) the .pipeline-figure
-   responsive dual-SVG; and (6) the positioned .hero / .hero-glyph
-   layout, which diverges from the canonical hero grid. */
+/* patinate.dunn.dev: the print shop on the estate tokens.
+   Palette, scale, spacing and radius come from @dunn.dev/reference;
+   the one deviation is Plex Serif for display. The site brings its own
+   chrome, so site.css is not imported (its .hero and .brand would collide).
+   Theme inks live in the theme JSONs, never here. */
 @import '@dunn.dev/reference/tokens/index.css';
-@import '@dunn.dev/reference/site.css';
 
 :root {
-  --font-display: 'Cormorant Garamond', 'EB Garamond', Georgia, serif;
+  --font-display: 'IBM Plex Serif', Georgia, serif;
+  --reg: var(--danger);
+  --shadow: 0 1px 0 rgb(0 0 0 / .06), 0 12px 32px -18px rgb(0 0 0 / .45);
+  --measure: 62ch;
+  --page: 1180px;
 }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) { --shadow: 0 1px 0 rgb(0 0 0 / .4), 0 14px 36px -18px rgb(0 0 0 / .9); }
+}
+:root[data-theme="dark"] { --shadow: 0 1px 0 rgb(0 0 0 / .4), 0 14px 36px -18px rgb(0 0 0 / .9); }
 
-/* Light-pinned: most consumer sites pin to light so diagrams and SVG
-   art keep authored contrast across visitor color-scheme preferences.
-   Canonical site.css does not set color-scheme, so this stays local.
-   See reference's design-system standard, "Light/dark pinning". */
-html { color-scheme: light; }
+*, *::before, *::after { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0; background: var(--bg); color: var(--text);
+  font-family: var(--font-body); font-size: var(--text-base); line-height: var(--lh-base);
+}
+a { color: var(--accent); text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: .18em; }
+a:hover { color: var(--accent-hover); }
+code, pre, kbd { font-family: var(--font-mono); font-size: .92em; }
+code { background: var(--surface); padding: .08em .35em; border-radius: var(--radius-sm); }
+pre {
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+  padding: var(--space-4) var(--space-5); overflow-x: auto; line-height: 1.5; font-size: var(--text-sm); margin: 0;
+}
+pre code { background: none; padding: 0; font-size: inherit; }
+h1, h2, h3 { font-family: var(--font-display); font-weight: 500; line-height: var(--lh-tight); margin: 0; letter-spacing: -.01em; }
+p { margin: 0 0 var(--space-4); }
+img, svg { max-width: 100%; height: auto; display: block; }
+button { font: inherit; color: inherit; }
+::selection { background: color-mix(in srgb, var(--accent) 30%, transparent); }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
-/* hero title: Cormorant Garamond italic, an editorial nod from the
-   earlier print-plate site. Overrides the canonical .hero-title
-   (display font, upright) — bespoke and additive. */
-.hero-title {
-  font-family: var(--font-display);
-  font-weight: 400;
-  font-style: italic;
-  letter-spacing: -0.02em;
+/* stamps: the shop's mono labels */
+.stamp {
+  font-family: var(--font-mono); font-size: var(--text-xs); letter-spacing: .14em;
+  text-transform: uppercase; color: var(--text-muted); font-weight: 500; margin: 0;
 }
+.stamp b { color: var(--text); font-weight: 600; }
 
-/* hero layout: patinate uses a positioned block hero with a decorative
-   glyph pinned upper-right, not the canonical hero grid (96px mark +
-   stack). The markup has no .hero-mark, so these override the canonical
-   .hero / .hero-glyph to keep patinate's layout. */
-.hero {
-  display: block;
-  position: relative;
-  padding: var(--space-7) 0 var(--space-6) 0;
-  border-bottom: 1px solid var(--border);
-  margin-bottom: var(--space-7);
+/* chrome */
+.wrap { max-width: var(--page); margin: 0 auto; padding: 0 var(--space-4); }
+@media (min-width: 720px) { .wrap { padding: 0 var(--space-6); } }
+.site-head { border-bottom: 1px solid var(--border); background: var(--bg); position: sticky; top: 0; z-index: 20; }
+.site-head .wrap { display: flex; align-items: center; gap: var(--space-4); min-height: 56px; }
+.brand { display: inline-flex; align-items: center; gap: .55rem; color: var(--text); text-decoration: none; font-family: var(--font-display); font-size: var(--text-lg); }
+.brand svg { width: 26px; height: 26px; flex: none; }
+.site-nav { margin-left: auto; display: flex; gap: var(--space-4); }
+.site-nav a { font-family: var(--font-mono); font-size: var(--text-sm); color: var(--text-2); text-decoration: none; padding: .35rem 0; border-bottom: 2px solid transparent; white-space: nowrap; }
+.site-nav a:hover { color: var(--text); }
+.site-nav a[aria-current="page"] { color: var(--text); border-bottom-color: var(--accent); }
+@media (max-width: 520px) {
+  .site-head .wrap { gap: var(--space-3); }
+  .brand { font-size: var(--text-md); }
+  .site-nav { gap: var(--space-3); }
+  .site-nav a { font-size: var(--text-xs); letter-spacing: .02em; }
+  .site-nav .ext { display: none; }
 }
-.hero-glyph {
-  position: absolute;
-  top: var(--space-7);
-  right: 0;
-  width: 180px;
-  height: auto;
-  /* Recedes so the hero title alone holds the moss accent focus. */
-  opacity: 0.45;
-}
-.hero-title {
-  font-size: clamp(3.5rem, 8vw, 6rem);
-  margin: 0 0 var(--space-3) 0;
-  color: var(--accent);
-  line-height: 1;
-}
+.site-foot { border-top: 1px solid var(--border); margin-top: var(--space-8); padding: var(--space-6) 0 var(--space-7); color: var(--text-muted); font-size: var(--text-sm); }
+.site-foot .wrap { display: flex; flex-wrap: wrap; gap: var(--space-3) var(--space-6); align-items: baseline; }
+.site-foot a { color: var(--text-2); }
+.site-foot .colophon { margin-left: auto; font-family: var(--font-mono); font-size: var(--text-xs); letter-spacing: .08em; }
 
-/* prose fills the content column. patinate is a data-sheet, not a
-   blog: body prose should match the width of the pipeline figure,
-   print frame, and tile grids beneath it, so the page column is the
-   single content measure. Canonical site.css caps .section-prose at
-   64ch — a reading measure right for docs sites like reference.dunn.dev,
-   but here it leaves prose a narrow ribbon against full-width boxes. */
-.section-prose { max-width: none; }
+/* sections */
+.section { padding: var(--space-8) 0 0; }
+.section-head { display: grid; gap: var(--space-2); margin-bottom: var(--space-6); max-width: var(--measure); }
+.section-head h1 { font-size: var(--text-3xl); font-weight: 400; }
+.section-head h2 { font-size: var(--text-3xl); }
+.section-head .lede { color: var(--text-2); font-size: var(--text-md); margin: 0; }
+.page-head { padding-top: var(--space-6); }
+.prose { max-width: var(--measure); color: var(--text-2); }
+.prose strong { color: var(--text); font-weight: 600; }
+.hint { font-size: var(--text-xs); color: var(--text-muted); margin: 0; }
 
-/* brand: one contiguous wordmark. Canonical sets only .brand-name to
-   mono, so "patinate" rendered mono while the trailing ".dunn.dev"
-   text node fell back to the sans body font — different font,
-   misaligned — and .brand's flex gap (for a mark patinate doesn't
-   carry) spaced them. Pin the whole .brand to the mono wordmark type
-   so both halves match; the name flips green on hover. */
-.brand {
-  gap: 0;
-  font-family: var(--font-mono);
-  font-size: var(--text-sm);
-  font-weight: 700;
-  letter-spacing: 0.02em;
+/* the hero: one print on the bench */
+.hero { padding: var(--space-7) 0 0; display: grid; gap: var(--space-6); align-items: end; }
+@media (min-width: 900px) { .hero { grid-template-columns: minmax(0, 7fr) minmax(0, 5fr); gap: var(--space-8); padding-top: var(--space-8); } }
+.hero h1 { font-size: var(--text-4xl); font-weight: 400; line-height: var(--lh-hero); letter-spacing: -.02em; max-width: 14ch; }
+.hero h1 em { font-style: italic; color: var(--accent); }
+.hero .lede { font-size: var(--text-lg); color: var(--text-2); max-width: 44ch; margin: var(--space-5) 0 var(--space-6); }
+.cta-row { display: flex; flex-wrap: wrap; gap: var(--space-3); align-items: center; }
+.btn {
+  display: inline-flex; align-items: center; gap: .5rem; font-family: var(--font-mono); font-size: var(--text-sm);
+  padding: .6rem 1rem; border-radius: var(--radius-sm); text-decoration: none; border: 1px solid var(--border-strong);
+  color: var(--text); background: transparent; cursor: pointer;
 }
-.brand-name { transition: color 0.12s ease; }
-.brand:hover .brand-name { color: var(--accent); }
+.btn:hover { border-color: var(--text); color: var(--text); }
+.btn.primary { background: var(--text); color: var(--bg); border-color: var(--text); }
+.btn.primary:hover { background: var(--accent); border-color: var(--accent); color: var(--accent-contrast); }
+.btn.small { padding: .35rem .7rem; font-size: var(--text-xs); }
+.btn:disabled { opacity: .5; cursor: progress; }
 
-/* pipeline-figure: ships a wide horizontal SVG for desktop and a
-   stacked vertical SVG for mobile. The wide one would horizontal-
-   scroll on narrow viewports with text too small to read; the
-   stacked variant carries the same information arranged for portrait
-   reading. Swap by viewport width, not by min-width-clamping the
-   single SVG. */
-.pipeline-figure .pipeline-wide { display: block; min-width: 0; }
-.pipeline-figure .pipeline-narrow { display: none; }
-@media (max-width: 720px) {
-  .pipeline-figure { overflow: visible; }
-  .pipeline-figure .pipeline-wide { display: none; }
-  .pipeline-figure .pipeline-narrow {
-    display: block;
-    width: 100%;
-    height: auto;
-    min-width: 0;
-  }
+/* a print: framed, with crop marks */
+.pull { position: relative; padding: 18px; margin: 0; }
+.pull::before, .pull::after, .pull > .marks::before, .pull > .marks::after {
+  content: ""; position: absolute; width: 14px; height: 14px; pointer-events: none;
+  border-color: var(--text-muted); border-style: solid; border-width: 0;
 }
+.pull::before { top: 0; left: 0; border-top-width: 1px; border-left-width: 1px; }
+.pull::after { top: 0; right: 0; border-top-width: 1px; border-right-width: 1px; }
+.pull > .marks::before { bottom: 0; left: 0; border-bottom-width: 1px; border-left-width: 1px; }
+.pull > .marks::after { bottom: 0; right: 0; border-bottom-width: 1px; border-right-width: 1px; }
+.pull > img { width: 100%; box-shadow: var(--shadow); background: var(--surface); }
+.pull .caption { display: flex; justify-content: space-between; flex-wrap: wrap; gap: var(--space-3); margin: var(--space-3) 0 0; }
 
-/* theme-tile: the four-theme gallery overrides the default .tile
-   padding so the rendered PNG bleeds to the tile edges. Caption
-   sits inset, separated from the image by a thin rule. */
-.tile.theme-tile {
-  padding: 0;
-  overflow: hidden;
-}
-.tile.theme-tile img {
-  display: block;
-  width: 100%;
-  height: auto;
-  border-bottom: 1px solid var(--border);
-}
-.tile.theme-tile figcaption {
-  padding: var(--space-3) var(--space-4) var(--space-4);
-}
-.tile.theme-tile .tile-eyebrow,
-.tile.theme-tile .tile-headline,
-.tile.theme-tile .tile-prose { margin: 0; }
-.tile.theme-tile .tile-headline { margin: var(--space-1) 0; }
-.tile.theme-tile .tile-prose { margin-top: var(--space-1); }
+/* ink bar: the swatch strip a printer leaves in the margin */
+.inkbar { display: flex; height: 10px; width: 100%; border: 1px solid var(--border); background: var(--surface); }
+.inkbar i { flex: 1; display: block; }
 
-/* The heatmap embed sits in a dark print-plate frame against the
-   paper canvas — preserves the editorial print-edition feel of the
-   earlier site within the canonical .diagram pattern. */
-.diagram.print-frame {
-  background: #1a1410;
-  padding: var(--space-4) var(--space-4) var(--space-5);
-  border: 0;
-  border-radius: var(--radius);
-  box-shadow:
-    0 1px 0 rgba(0,0,0,0.06),
-    0 8px 28px rgba(60, 41, 20, 0.12),
-    0 2px 8px rgba(60, 41, 20, 0.08);
-  overflow: hidden;
-  position: relative;
-}
-.diagram.print-frame .heatmap-host {
-  background: #faf6ed;
-  margin-top: var(--space-3);
-  aspect-ratio: 3 / 4;
-  position: relative;
-  overflow: hidden;
-}
-.diagram.print-frame .heatmap-host svg {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  display: block;
-  min-width: 0;
-}
-.diagram.print-frame .print-caption {
-  display: flex;
-  justify-content: space-between;
-  font-family: var(--font-mono);
-  font-size: var(--text-xs);
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
-  color: rgba(244, 238, 220, 0.55);
-  margin: var(--space-2) 0 0 0;
-}
+/* the wall */
+.wall { display: grid; gap: var(--space-6) var(--space-5); grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); }
+@media (max-width: 560px) { .wall { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-5) var(--space-3); } }
+.wall figure { margin: 0; display: grid; gap: var(--space-3); align-content: start; min-width: 0; }
+.wall .frame { display: block; aspect-ratio: 3 / 4; overflow: hidden; background: var(--surface); box-shadow: var(--shadow); border: 1px solid var(--border); }
+.wall .frame img { width: 100%; height: 100%; object-fit: cover; }
+.wall figcaption { display: grid; gap: .3rem; min-width: 0; }
+.wall .edition { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 0 var(--space-3); }
+.wall .name { font-family: var(--font-display); font-size: var(--text-lg); color: var(--text); overflow-wrap: anywhere; }
+.wall .name a { color: inherit; text-decoration: none; }
+.wall .name a:hover { color: var(--accent); }
+.wall .note { color: var(--text-2); font-size: var(--text-sm); margin: 0; }
+@media (max-width: 560px) { .wall .name { font-size: var(--text-md); } .wall .note { font-size: var(--text-xs); } }
 
-/* Filter chip strip beneath the print frame. Lifts the editorial
-   filter-list from the earlier site into the canonical chrome's
-   tile vocabulary. */
-.filter-chips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-2);
-  margin: var(--space-3) 0 var(--space-5);
-}
-.filter-chips button {
-  font-family: var(--font-mono);
-  font-size: var(--text-xs);
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  background: transparent;
-  border: 1px solid var(--border);
-  color: var(--text-muted);
-  padding: var(--space-2) var(--space-3);
-  border-radius: var(--radius);
-  cursor: pointer;
-  transition: color 120ms ease, border-color 120ms ease;
-}
-.filter-chips button:hover { color: var(--accent); border-color: var(--accent); }
-.filter-chips button[aria-pressed="true"] {
-  color: var(--bg);
-  background: var(--accent);
-  border-color: var(--accent);
-}
-.filter-chips .count {
-  margin-left: var(--space-2);
-  font-style: normal;
-  opacity: 0.7;
-}
+/* numbered cards: plates and the operating sequence */
+.plates { display: grid; gap: var(--space-4); grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); counter-reset: plate; }
+.plate { border: 1px solid var(--border); background: var(--surface); padding: var(--space-5); display: grid; gap: var(--space-3); align-content: start; position: relative; min-width: 0; }
+.plate::before { counter-increment: plate; content: counter(plate, decimal-leading-zero); position: absolute; top: var(--space-3); right: var(--space-4); font-family: var(--font-mono); font-size: var(--text-xs); color: var(--text-muted); letter-spacing: .1em; }
+.plate h3 { font-size: var(--text-xl); }
+.plate p { color: var(--text-2); font-size: var(--text-sm); margin: 0; }
+.plate pre { padding: var(--space-3) var(--space-4); background: var(--bg); }
 
-/* ── narrow viewports (patinate-local hero/glyph) ───────────────── */
-
-@media (max-width: 720px) {
-  .hero-glyph { position: static; width: 120px; margin-bottom: var(--space-4); }
-  .hero { padding-top: var(--space-5); }
+/* copyable code */
+.copyable { position: relative; padding-right: 4.5rem; }
+.copyable .copy {
+  position: absolute; top: .4rem; right: .4rem; font-family: var(--font-mono); font-size: var(--text-xs);
+  padding: .2rem .5rem; border: 1px solid var(--border-strong); background: var(--bg); color: var(--text-2);
+  border-radius: var(--radius-sm); cursor: pointer;
 }
+.copyable .copy:hover { color: var(--text); border-color: var(--text); }
+
+/* docs */
+.docs { display: grid; gap: var(--space-7); padding-top: var(--space-6); }
+@media (min-width: 900px) { .docs { grid-template-columns: 200px minmax(0, 1fr); gap: var(--space-8); align-items: start; } }
+.toc { position: sticky; top: 72px; display: grid; gap: .4rem; font-family: var(--font-mono); font-size: var(--text-sm); }
+.toc a { color: var(--text-2); text-decoration: none; padding: .2rem 0 .2rem .75rem; border-left: 1px solid var(--border); }
+.toc a:hover { color: var(--text); border-left-color: var(--text); }
+.toc .stamp { padding-left: .75rem; margin-bottom: .4rem; }
+@media (max-width: 899px) { .toc { position: static; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); } }
+.doc { display: grid; gap: var(--space-8); min-width: 0; }
+.doc section { display: grid; gap: var(--space-4); scroll-margin-top: 80px; min-width: 0; }
+.doc h2 { font-size: var(--text-2xl); display: flex; align-items: baseline; gap: var(--space-3); }
+.doc h3 { font-size: var(--text-lg); margin-top: var(--space-3); }
+.doc p { max-width: var(--measure); color: var(--text-2); margin: 0; }
+.doc table { border-collapse: collapse; width: 100%; font-size: var(--text-sm); }
+.doc th { text-align: left; font-family: var(--font-mono); font-weight: 500; font-size: var(--text-xs); letter-spacing: .12em; text-transform: uppercase; color: var(--text-muted); padding: .5rem .75rem .5rem 0; border-bottom: 1px solid var(--border-strong); }
+.doc td { padding: .55rem .75rem .55rem 0; border-bottom: 1px solid var(--border); vertical-align: top; color: var(--text-2); }
+.doc td:first-child { white-space: nowrap; color: var(--text); }
+.table-wrap { overflow-x: auto; }
+.callout { border-left: 3px solid var(--accent); background: var(--accent-subtle); padding: var(--space-3) var(--space-4); max-width: var(--measure); color: var(--text-2); font-size: var(--text-sm); }
+
+/* the press */
+.press { display: grid; gap: var(--space-6); }
+@media (min-width: 980px) { .press { grid-template-columns: 300px minmax(0, 1fr); gap: var(--space-7); align-items: start; } }
+.bench { display: grid; gap: var(--space-4); min-width: 0; }
+@media (min-width: 980px) { .bench { position: sticky; top: 72px; order: 2; } }
+.proof { position: relative; width: 100%; aspect-ratio: 3 / 4; box-shadow: var(--shadow); border: 1px solid var(--border); background: var(--proof-paper, var(--surface)); overflow: hidden; }
+.proof svg { width: 100%; height: 100%; }
+.proof .loading { position: absolute; inset: 0; display: grid; place-items: center; font-family: var(--font-mono); font-size: var(--text-sm); letter-spacing: .1em; text-transform: uppercase; color: var(--text-muted); }
+.proof-meta { display: flex; justify-content: space-between; flex-wrap: wrap; gap: var(--space-3); }
+.controls { display: grid; gap: var(--space-5); min-width: 0; }
+.controls fieldset { border: 1px solid var(--border); background: var(--surface); padding: var(--space-4) var(--space-4) var(--space-5); margin: 0; display: grid; gap: var(--space-3); min-width: 0; }
+.controls legend { font-family: var(--font-mono); font-size: var(--text-xs); letter-spacing: .14em; text-transform: uppercase; color: var(--text-muted); padding: 0 .4rem; }
+.tag { font-family: var(--font-mono); font-size: .66rem; letter-spacing: .06em; color: var(--text-muted); border: 1px solid var(--border-strong); border-radius: var(--radius-sm); padding: 0 .3rem; margin-left: .3rem; white-space: nowrap; }
+.tag.flag { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 45%, transparent); }
+.row { display: grid; grid-template-columns: 1fr auto; gap: .4rem .75rem; align-items: center; font-size: var(--text-sm); }
+.row label { color: var(--text-2); }
+.row output { font-family: var(--font-mono); font-size: var(--text-xs); color: var(--text-muted); min-width: 3.5ch; text-align: right; }
+.row input[type="range"] { grid-column: 1 / -1; width: 100%; accent-color: var(--accent); margin: 0; }
+.row input[type="range"]:disabled { opacity: .4; }
+.row input[type="color"] { width: 36px; height: 24px; padding: 0; border: 1px solid var(--border-strong); background: none; border-radius: var(--radius-sm); cursor: pointer; }
+.row.inkrow { grid-template-columns: 1fr auto auto; }
+.row.inkrow code { font-size: var(--text-xs); }
+.chips { display: flex; flex-wrap: wrap; gap: .4rem; }
+.chip { font-family: var(--font-mono); font-size: var(--text-xs); padding: .35rem .6rem; border: 1px solid var(--border-strong); background: transparent; border-radius: var(--radius-sm); cursor: pointer; color: var(--text-2); }
+.chip:hover { border-color: var(--text); color: var(--text); }
+.chip[aria-pressed="true"] { background: var(--text); color: var(--bg); border-color: var(--text); }
+.chip:disabled { opacity: .4; cursor: not-allowed; }
+.chip .n { opacity: .6; margin-left: .35rem; }
+.select { width: 100%; font-family: var(--font-mono); font-size: var(--text-sm); padding: .5rem .6rem; border: 1px solid var(--border-strong); background: var(--bg); color: var(--text); border-radius: var(--radius-sm); }
+.cmdline { font-size: var(--text-xs); line-height: 1.6; color: var(--text-2); white-space: pre-wrap; word-break: break-word; padding: var(--space-3) var(--space-4); }
+.actions { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+
+/* brand sheet */
+.sheet-grid { display: grid; gap: var(--space-6); grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); }
+.mark-row { display: flex; flex-wrap: wrap; gap: var(--space-6); align-items: end; }
+.mark-row figure { margin: 0; display: grid; gap: var(--space-2); justify-items: start; color: var(--text); }
+.mark-row .on-ink { background: var(--text); color: var(--bg); padding: var(--space-4); }
+.swatches { display: grid; gap: var(--space-2); grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); }
+.swatch { border: 1px solid var(--border); display: grid; }
+.swatch i { display: block; height: 56px; }
+.swatch span { padding: .4rem .5rem; font-family: var(--font-mono); font-size: var(--text-xs); color: var(--text-2); display: grid; }
+.swatch span b { color: var(--text); font-weight: 500; }
+.type-spec { display: grid; gap: var(--space-2); border-top: 1px solid var(--border); padding-top: var(--space-3); }
+.type-spec .sample-display { font-family: var(--font-display); font-size: var(--text-3xl); }
+.type-spec .sample-body { font-size: var(--text-md); color: var(--text-2); }
+.type-spec .sample-mono { font-family: var(--font-mono); font-size: var(--text-sm); overflow-wrap: anywhere; }
+.readme-mock { border: 1px solid var(--border); background: #ffffff; color: #1f2328; padding: var(--space-5); border-radius: var(--radius-md); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif; font-size: 15px; line-height: 1.5; }
+.readme-mock h1 { font-family: inherit; font-size: 1.8em; font-weight: 600; border-bottom: 1px solid #d1d9e0; padding-bottom: .3em; margin: 1rem 0 .8rem; }
+.readme-mock .badges { display: flex; gap: .3rem; flex-wrap: wrap; margin-bottom: .8rem; }
+.readme-mock .badges i { display: inline-block; height: 20px; width: 92px; border-radius: 3px; background: linear-gradient(90deg, #555 50%, #4c1 50%); }
+.readme-mock .badges i:nth-child(3) { background: linear-gradient(90deg, #555 55%, #fc6d26 55%); }
+.readme-mock p { color: #1f2328; }
+.readme-mock code { background: #eff1f3; color: #1f2328; }
+.readme-mock a { color: #0969da; }

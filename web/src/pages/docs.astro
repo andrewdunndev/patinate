@@ -1,0 +1,171 @@
+---
+import Layout from '../layouts/Layout.astro';
+import { editions } from '../data/themes';
+
+const sample = editions.find((e) => e.theme.name === 'newsprint')!.theme;
+const schema = JSON.stringify({ ...sample, name: 'my_theme' }, null, 2);
+
+const flags: [string, string][] = [
+  ['--theme <name>', 'Theme to apply. Overrides [render].theme.'],
+  ['--themes-dir <dir>', 'Directory of custom *.json themes, searched before the embedded set.'],
+  ['--cycling', 'Only Ride and EBikeRide.'],
+  ['--type <list>', 'Comma-separated activity types: Ride, EBikeRide, VirtualRide, Run, VirtualRun, Walk, Hike.'],
+  ['--gear <id>', 'Strava gear_id filter. Repeatable.'],
+  ['--activity-id <n>', 'Render a single activity by Strava ID.'],
+  ['--min-distance-m <m>', 'Drop activities shorter than m. Default 1000.'],
+  ['--web', 'Inline-embed preset: lighter glow, compact paths, no text plate, minor roads or streams. It does not imply --anonymize.'],
+  ['--transparent-bg', 'Skip the background rect, for a page ground.'],
+  ['--heat-only', 'Skip the basemap; heat and text only.'],
+  ['--anonymize', 'Strip data-* from heat paths and scrub <desc>. For anything public.'],
+  ['--obfuscation-radius-m <m>', 'Override the privacy radius for one render.'],
+  ['--heat-bloom <f>', 'Multiplier on the glow stack. 0 = sharp, 1 = theme default, 2+ = soft cloud.'],
+  ['--heat-alpha <f>', 'Multiplier on the sharp-core stroke opacity.'],
+  ['--radius-m <m>', 'Override the configured map radius.'],
+  ['--viewbox-width <px> / --viewbox-height <px>', 'Override the viewBox dimensions.'],
+  ['--fit <contain|cover>', 'contain (default) letterboxes the radius circle; cover fills the viewBox and crops. The frame never depends on rides or home.'],
+  ['--no-refine', 'Skip the OSM filter pipeline. Diagnostic.'],
+  ['--config <path>', 'TOML config. Default ~/.config/patinate/config.toml.'],
+  ['--osm <path>', 'Pre-fetched OSM JSON. Default: the per-user cache.'],
+  ['--activities <path>', 'JSON array of activities. Default: read from the cache.'],
+  ['--cache <path>', 'SQLite cache path. Default: per-user.'],
+  ['--out <path>', 'Output SVG. Default heatmap.svg.'],
+];
+
+const env: [string, string][] = [
+  ['STRAVA_PATINATE_CLIENT_SECRET', 'OAuth client secret.'],
+  ['STRAVA_PATINATE_REFRESH_TOKEN', 'Long-lived refresh token.'],
+  ['STRAVA_PATINATE_ACCESS_TOKEN', 'Optional 24 h access token.'],
+  ['PATINATE_CONFIG', 'TOML config path.'],
+  ['PATINATE_OSM', 'OSM JSON path (read by render, written by fetch-osm).'],
+  ['PATINATE_THEMES_DIR', 'Custom themes directory.'],
+  ['PATINATE_OVERPASS_ENDPOINT', 'Overpass API URL.'],
+  ['PATINATE_CACHE', 'SQLite cache path.'],
+  ['PATINATE_ACTIVITIES', 'Activity JSON path (skips the cache).'],
+];
+
+const toc = [
+  ['install', 'install'], ['config', 'config'], ['auth', 'auth'], ['basemap', 'fetch-osm'], ['sync', 'sync'],
+  ['render', 'render'], ['themes', 'themes'], ['flags', 'flags'], ['publish', 'publish'], ['env', 'environment'],
+];
+const n = (id: string) => String(toc.findIndex(([t]) => t === id) + 1).padStart(2, '0');
+---
+<Layout title="Docs" description="Install, configure and run patinate: auth, fetch-osm, sync, render, the themes and every render flag.">
+  <div class="section-head page-head">
+    <p class="stamp">docs</p>
+    <h1>Install it, point it at your rides, render.</h1>
+  </div>
+  <div class="docs" style="padding-top:0">
+    <nav class="toc" aria-label="Sections">
+      <span class="stamp">sections</span>
+      {toc.map(([id, label]) => <a href={`#${id}`}>{n(id)} {label}</a>)}
+    </nav>
+
+    <div class="doc">
+      <section id="install">
+        <h2><span class="stamp">{n('install')}</span> Install</h2>
+        <pre class="copyable"><code>cargo install patinate</code></pre>
+        <p>Or <code>cargo install --git https://gitlab.com/dunn.dev/patinate</code> to build from source. The build needs a C compiler (<code>build-essential</code>, or <code>xcode-select --install</code> on macOS); there are no runtime dependencies. Signed binaries are on the <a href="https://gitlab.com/dunn.dev/patinate/-/releases">releases page</a>.</p>
+      </section>
+
+      <section id="config">
+        <h2><span class="stamp">{n('config')}</span> Config</h2>
+        <p>Register a Strava app at <a href="https://www.strava.com/settings/api">strava.com/settings/api</a> with the authorization callback domain <code>localhost</code>, then write <code>~/.config/patinate/config.toml</code>:</p>
+        <pre class="copyable"><code>{`[general]
+city_name  = "Your City"
+country    = "USA"
+center_lat = 42.9634   # downtown
+center_lng = -85.6681
+radius_m   = 25000
+
+[render]
+theme          = "noir_heat"
+viewbox_width  = 1200
+viewbox_height = 1600
+
+[privacy]
+home_lat             = 42.9999  # YOUR home, not the map center
+home_lng             = -85.9999
+obfuscation_radius_m = 1000
+salt                 = "output of: openssl rand -hex 16"
+
+[strava]
+client_id     = "12345"
+client_secret = "your-strava-client-secret"`}</code></pre>
+        <div class="callout">The salt must be at least 16 characters, private, and never changed: it fixes where the hidden zone sits. Any radius above 0 refuses to render without it. <code>offset_m</code> (default 750, minimum 250) bounds how far the zone moves from home. See <a href="/#privacy">what the zone hides</a>.</div>
+      </section>
+
+      <section id="auth">
+        <h2><span class="stamp">{n('auth')}</span> Auth</h2>
+        <pre class="copyable"><code>patinate auth</code></pre>
+        <p>Runs the OAuth flow once with the <code>activity:read_all</code> scope and writes the tokens into <code>config.toml</code> at mode 0600 (parent dir 0700). The dashboard's "Your Access Token" is read-only and will not work for sync.</p>
+      </section>
+
+      <section id="basemap">
+        <h2><span class="stamp">{n('basemap')}</span> Fetch the basemap</h2>
+        <pre class="copyable"><code>patinate fetch-osm --city "Your City, USA" --radius-m 25000</code></pre>
+        <p>Pulls the OpenStreetMap basemap through Overpass and caches it as JSON. Once per city; fetch again when you move or change the radius. Overpass 429 and 5xx stop the run at once; set <code>PATINATE_OVERPASS_ENDPOINT</code> for a private mirror.</p>
+      </section>
+
+      <section id="sync">
+        <h2><span class="stamp">{n('sync')}</span> Sync</h2>
+        <pre class="copyable"><code>patinate sync</code></pre>
+        <p>An incremental pull of your activities into a SQLite cache, the one command you run often. The watermark advances only after a full sweep and writes are idempotent, so a partial failure repeats work rather than duplicating it. A Strava 429 honors <code>Retry-After</code> once, capped at 60 s. There are no schema migrations yet: after an upgrade that changes the schema, delete <code>cache.db</code> and sync again.</p>
+      </section>
+
+      <section id="render">
+        <h2><span class="stamp">{n('render')}</span> Render</h2>
+        <pre class="copyable"><code>patinate render --theme warm_beige --cycling --out heatmap.svg</code></pre>
+        <p>Reads the config and both caches and writes a poster SVG, with no network. The SVG is layered: basemap (water, parks, six road tiers), a glow stack, the heat strokes, and the text plate. Each answers to a flag below.</p>
+        <h3>The web preset</h3>
+        <p><code>--web</code> trims a render for a page: compact paths, a lighter glow, no text plate, no minor roads or streams. Pair it with <code>--transparent-bg</code> to set it under a page. One way to ship it is to render once and rasterize:</p>
+        <pre class="copyable"><code>{`patinate render --theme cycle_heat --cycling --web --transparent-bg \\
+  --radius-m 12000 --viewbox-width 1200 --viewbox-height 720 --fit cover \\
+  --anonymize --out hero.svg
+rsvg-convert hero.svg -w 3600 -h 2160 -o /tmp/hero.png
+magick /tmp/hero.png -quality 82 hero.webp`}</code></pre>
+      </section>
+
+      <section id="themes">
+        <h2><span class="stamp">{n('themes')}</span> Themes</h2>
+        <p>Six themes are embedded in the binary; <code>patinate list-themes</code> shows them and anything in <code>--themes-dir</code>. The heat core multiplies on a light ground and screens on a dark one; <code>heat.blend</code> (<code>normal</code>, <code>multiply</code>, <code>screen</code>) pins it.</p>
+        <div class="table-wrap"><table>
+          <thead><tr><th>theme</th><th>palette</th><th>use when</th></tr></thead>
+          <tbody>
+            {editions.map(({ theme, note, use }) => <tr><td><a href={`/playground/#${theme.name}`}><code>{theme.name}</code></a></td><td>{note}</td><td>{use}</td></tr>)}
+          </tbody>
+        </table></div>
+        <h3>Your own theme</h3>
+        <p>Start one on <a href="/playground/">the press</a> and save the JSON, or copy a shipped theme. Then:</p>
+        <pre class="copyable"><code>{`mkdir -p themes && mv ~/Downloads/my_theme.json themes/
+patinate list-themes --themes-dir ./themes
+patinate render --themes-dir ./themes --theme my_theme --out my_theme.svg`}</code></pre>
+        <p>The schema, by example (this is <code>newsprint</code> renamed). The glow keys and <code>heat.blend</code> are optional; without them the renderer uses its defaults.</p>
+        <pre><code>{schema}</code></pre>
+      </section>
+
+      <section id="flags">
+        <h2><span class="stamp">{n('flags')}</span> Render flags</h2>
+        <div class="table-wrap"><table>
+          <thead><tr><th>flag</th><th>effect</th></tr></thead>
+          <tbody>{flags.map(([f, e]) => <tr><td><code>{f}</code></td><td>{e}</td></tr>)}</tbody>
+        </table></div>
+      </section>
+
+      <section id="publish">
+        <h2><span class="stamp">{n('publish')}</span> Before you publish</h2>
+        <p>A default render embeds <code>data-rider</code>, <code>data-bike</code>, <code>data-year</code> and <code>data-type</code> on the heat paths and the exact center coordinates in <code>&lt;desc&gt;</code>. That is useful for a page's filters and identifying in public. For anything public:</p>
+        <pre class="copyable"><code>patinate render --theme cycle_heat --anonymize --obfuscation-radius-m 1000 --out heatmap.svg</code></pre>
+        <p><code>--anonymize</code> drops the attributes and the <code>&lt;desc&gt;</code>; a PNG hides no more than that. It also warns when the map center sits within the radius plus <code>offset_m</code> of home, since the frame centers on it. The rendered SVG is yours; the GPS traces are Strava's, under <a href="https://www.strava.com/legal/api">their API terms</a>. Report a privacy bypass through <a href="https://gitlab.com/dunn.dev/patinate/-/blob/main/SECURITY.md">SECURITY.md</a>.</p>
+      </section>
+
+      <section id="env">
+        <h2><span class="stamp">{n('env')}</span> Environment</h2>
+        <p>Any config key also reads from <code>PATINATE_&lt;SECTION&gt;__&lt;KEY&gt;</code>, for example <code>PATINATE_RENDER__VIEWBOX_WIDTH=1600</code>.</p>
+        <div class="table-wrap"><table>
+          <thead><tr><th>variable</th><th>purpose</th></tr></thead>
+          <tbody>{env.map(([v, p]) => <tr><td><code>{v}</code></td><td>{p}</td></tr>)}</tbody>
+        </table></div>
+      </section>
+    </div>
+  </div>
+</Layout>

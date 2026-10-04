@@ -3,7 +3,7 @@
 // sees malformed colors.
 //
 // Themes ship two ways:
-//   * Embedded — the four shipped themes are baked into the binary
+//   * Embedded — the shipped themes are baked into the binary
 //     via `include_str!`. `cargo install --git` users get them at
 //     zero ceremony.
 //   * On-disk — pass `--themes-dir` to a directory of `*.json` files
@@ -18,12 +18,16 @@ const NOIR_HEAT: &str = include_str!("../../themes/noir_heat.json");
 const BLUEPRINT_HEAT: &str = include_str!("../../themes/blueprint_heat.json");
 const WARM_BEIGE: &str = include_str!("../../themes/warm_beige.json");
 const CYCLE_HEAT: &str = include_str!("../../themes/cycle_heat.json");
+const NEWSPRINT: &str = include_str!("../../themes/newsprint.json");
+const VERDIGRIS: &str = include_str!("../../themes/verdigris.json");
 
 const EMBEDDED_THEMES: &[(&str, &str)] = &[
     ("noir_heat", NOIR_HEAT),
     ("blueprint_heat", BLUEPRINT_HEAT),
     ("warm_beige", WARM_BEIGE),
     ("cycle_heat", CYCLE_HEAT),
+    ("newsprint", NEWSPRINT),
+    ("verdigris", VERDIGRIS),
 ];
 
 #[derive(Debug, Clone, Deserialize)]
@@ -304,6 +308,33 @@ mod tests {
             let t = load_named(name, None).expect("embedded theme loads");
             assert_eq!(t.heat.blend, None, "{name} ships without a blend");
             assert_eq!(t.heat_blend(), want, "{name}");
+        }
+    }
+
+    #[test]
+    fn every_embedded_theme_parses_under_its_own_name() {
+        for name in embedded_names() {
+            let t = load_named(name, None).expect("embedded theme loads");
+            assert_eq!(t.name, name);
+            let on_disk = load(format!("themes/{name}.json")).expect("theme file loads");
+            assert_eq!(on_disk.name, name);
+        }
+    }
+
+    #[test]
+    fn newsprint_and_verdigris_carry_the_blend_their_ground_implies() {
+        for (name, want, light) in [
+            ("newsprint", HeatBlend::Multiply, true),
+            ("verdigris", HeatBlend::Screen, false),
+        ] {
+            let t = load_named(name, None).expect("embedded theme loads");
+            assert_eq!(t.bg.is_light(), light, "{name}");
+            assert_eq!(t.heat.blend, Some(want), "{name} sets heat.blend");
+            assert_eq!(t.heat_blend(), want, "{name}");
+            assert!(
+                t.heat.glow_outer_alpha > default_glow_outer_alpha(),
+                "{name}"
+            );
         }
     }
 

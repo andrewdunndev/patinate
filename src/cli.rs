@@ -46,7 +46,7 @@ enum Command {
     /// Pull new activities from Strava into the local cache.
     Sync(SyncArgs),
 
-    /// List available themes. Always shows the four embedded themes;
+    /// List available themes. Always shows the embedded themes;
     /// `--themes-dir` adds anything from a directory of `*.json` files
     /// on top.
     ListThemes(ListThemesArgs),
@@ -151,7 +151,7 @@ struct RenderArgs {
     #[arg(long)]
     theme: Option<String>,
 
-    /// Directory of `*.json` theme files. If omitted, only the four
+    /// Directory of `*.json` theme files. If omitted, only the
     /// embedded themes are searched. When set, on-disk themes override
     /// embedded ones with matching names.
     #[arg(long, env = "PATINATE_THEMES_DIR")]
