@@ -1,5 +1,5 @@
 [toolchain]
-channel = "1.98.1"
+channel = "1.99.0"
 components = ["rustfmt", "clippy"]
 # Every release cross-compile target must be listed here. The CI image
 # prepares targets for its own default toolchain, but rustup installs a
